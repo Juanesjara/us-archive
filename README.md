@@ -60,7 +60,7 @@ When any of the required variables is missing, the app renders a "Firebase is no
 ## Authentication setup
 
 1. Enable **Email/Password** sign-in. Either run `firebase deploy --only auth` (the provider is declared in `firebase.json`), or in the console open **Authentication**, click **Get started**, then **Sign-in method**, **Email/Password**. Leave "Email link" off.
-2. People sign in with a **name**, not an email. Internally each name maps to `<name>@members.us-archive.app`, an address nobody receives mail for and that never appears in the interface (see `src/lib/username.ts`). Names are lowercased and accents are stripped, so "Juan" and "juan" are the same account. To add someone, open **Authentication**, **Users**, **Add user**, and enter `<name>@members.us-archive.app` with a password. There is no sign-up form in the app on purpose. Password resets are done from the console, since there is no real inbox.
+2. People sign in with a **name**, not an email. Internally each name maps to `<name>@members.us-archive.app`, an address nobody receives mail for and that never appears in the interface (see `src/lib/username.ts`). Names are lowercased and accents are stripped, so "Juan" and "juan" are the same account. To add someone, open **Authentication**, **Users**, **Add user**, and enter `<name>@members.us-archive.app` with a password. There is no sign-up form in the app on purpose. Password resets are done from the console, since there is no real inbox. The sign-in form lowercases and trims the password before sending it, so every password must be set in lowercase.
 3. Copy each account's **User UID**. You need them in the next step.
 
 ## Firestore setup

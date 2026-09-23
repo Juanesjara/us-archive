@@ -65,7 +65,8 @@ export function Login() {
     setError(null)
     setBusy(true)
     try {
-      await signIn(nameToEmail(name), password)
+      // Passwords are stored in lowercase, so "VESUVIO" or "Vesuvio" work too.
+      await signIn(nameToEmail(name), password.trim().toLowerCase())
       const from = (location.state as { from?: string } | null)?.from
       navigate(from ?? (hasSeenIntro() ? '/archive' : '/intro'), { replace: true })
     } catch (err) {
