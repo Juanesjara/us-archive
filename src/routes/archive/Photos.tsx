@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useCollection } from '../../hooks/useCollection'
 import type { Photo } from '../../types'
 import { EmptyState, ErrorNote, Loading } from '../../components/ui/EmptyState'
 import { Lightbox } from '../../components/ui/Lightbox'
 import { ArchiveImage } from '../../components/ui/ArchiveImage'
-import { formatShort } from '../../lib/format'
+import { formatFull } from '../../lib/format'
+import { groupIntoAlbums } from '../../lib/albums'
 
 export function Photos() {
   const { items, loading, error } = useCollection<Photo>('photos')
-  const [open, setOpen] = useState<number | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+
+  const albums = useMemo(() => groupIntoAlbums(items), [items])
+  // The lightbox walks through photos in the same order the albums show them.
+  const ordered = useMemo(() => albums.flatMap((a) => a.photos), [albums])
+  const openIndex = openId ? ordered.findIndex((p) => p.id === openId) : -1
 
   return (
     <div className="enter">
@@ -21,31 +27,52 @@ export function Photos() {
       ) : items.length === 0 ? (
         <EmptyState title="Todavía no hay fotos." text="Ya lo arreglaremos." />
       ) : (
-        <ul className="mt-10 columns-2 gap-4 sm:gap-6 md:columns-3">
-          {items.map((photo, i) => (
-            <li key={photo.id} className="mb-4 break-inside-avoid sm:mb-6">
-              <button
-                type="button"
-                onClick={() => setOpen(i)}
-                className="block w-full text-left"
-                aria-label={photo.caption ? `Abrir foto: ${photo.caption}` : 'Abrir foto'}
-              >
-                <ArchiveImage
-                  id={photo.imageId}
-                  alt={photo.caption || ''}
-                  className="w-full rounded-sm transition-opacity duration-300 hover:opacity-90"
-                />
-                <div className="mt-2 flex items-baseline justify-between gap-3">
-                  <span className="serif truncate text-ui text-body">{photo.caption || ''}</span>
-                  <span className="shrink-0 text-meta text-faint">{formatShort(photo.date)}</span>
+        <div className="mt-10 flex flex-col gap-16">
+          {albums.map((album) => (
+            <section key={album.key} aria-label={`${formatFull(album.day)}${album.place ? `, ${album.place}` : ''}`}>
+              <header className="mb-5 border-b border-rule pb-3">
+                <h2 className="serif text-lead text-ink">{formatFull(album.day)}</h2>
+                <div className="mt-1 flex items-baseline justify-between gap-6 text-meta text-muted">
+                  <span className="truncate">{album.place ?? ''}</span>
+                  <span className="shrink-0">
+                    {album.photos.length === 1 ? '1 foto' : `${album.photos.length} fotos`}
+                  </span>
                 </div>
-              </button>
-            </li>
+              </header>
+              <ul className="columns-2 gap-4 sm:gap-6 md:columns-3">
+                {album.photos.map((photo) => (
+                  <li key={photo.id} className="mb-4 break-inside-avoid sm:mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setOpenId(photo.id)}
+                      className="block w-full text-left"
+                      aria-label={photo.caption ? `Abrir foto: ${photo.caption}` : 'Abrir foto'}
+                    >
+                      <ArchiveImage
+                        id={photo.imageId}
+                        alt={photo.caption || ''}
+                        className="w-full rounded-sm transition-opacity duration-300 hover:opacity-90"
+                      />
+                      {photo.caption ? (
+                        <span className="serif mt-2 block truncate text-ui text-body">{photo.caption}</span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
-      {open !== null ? <Lightbox photos={items} index={open} onClose={() => setOpen(null)} onIndex={setOpen} /> : null}
+      {openIndex >= 0 ? (
+        <Lightbox
+          photos={ordered}
+          index={openIndex}
+          onClose={() => setOpenId(null)}
+          onIndex={(n) => setOpenId(ordered[n]?.id ?? null)}
+        />
+      ) : null}
     </div>
   )
 }

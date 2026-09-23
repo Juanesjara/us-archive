@@ -78,15 +78,21 @@ async function withImage<T>(file: File | null | undefined, write: (imageId: stri
 
 export interface PhotoInput {
   date: Timestamp
+  hasTime: boolean
   caption?: string
   location?: string
+  city?: string | null
+  lat?: number | null
+  lng?: number | null
 }
 
 export async function addPhoto(file: File, input: PhotoInput) {
   await withImage(file, (imageId) =>
     addDoc(collection(getDb(), 'photos'), {
-      ...clean({ caption: input.caption, location: input.location }),
+      ...clean({ caption: input.caption, location: input.location, city: input.city ?? undefined }),
+      ...(input.lat != null && input.lng != null ? { lat: input.lat, lng: input.lng } : {}),
       date: input.date,
+      hasTime: input.hasTime,
       imageId,
       createdAt: serverTimestamp(),
     }),
@@ -96,9 +102,16 @@ export async function addPhoto(file: File, input: PhotoInput) {
 export async function updatePhoto(id: string, input: PhotoInput) {
   await updateDoc(doc(getDb(), 'photos', id), {
     date: input.date,
+    hasTime: input.hasTime,
     caption: input.caption?.trim() || null,
     location: input.location?.trim() || null,
+    city: input.city?.trim() || null,
   })
+}
+
+/** The only field edited after upload: an optional description. Empty clears it. */
+export async function setPhotoCaption(id: string, caption: string) {
+  await updateDoc(doc(getDb(), 'photos', id), { caption: caption.trim() || null })
 }
 
 export async function deletePhoto(id: string, imageId: string) {

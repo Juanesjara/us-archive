@@ -96,6 +96,10 @@ Cloud Storage needs the paid Blaze plan on new projects, so photos live in Fires
 - Each image is its own document in `images/{id}`. Photos, memories, places and the official state only store the id, so lists and counts never download image data. Images load one by one as they are shown and are cached for the session.
 - Images are immutable. Replacing a photo stores a new image and deletes the old one. Deleting an entry deletes its image.
 - Images are protected by the same rules as everything else. There are no public URLs.
+- Uploading is a single step: pick one or many photos in `/admin/photos` and they upload right away. Before compressing, the app reads each file's metadata with `exifr`: the time it was taken and its GPS position. Coordinates are turned into a short place name ("El Poblado, Medellín") through OpenStreetMap's public Nominatim service, one request per second, cached. Photos without metadata get today's date and no place.
+- The gallery groups photos into albums by local day and city automatically. There is nothing to name or manage.
+- A description is optional and added afterwards: open a photo in the gallery and use "Añadir descripción" (admins only).
+- On an iPhone, the photo picker may leave out the location. If photos arrive without a place, tap "Opciones" at the top of the picker and turn on location.
 
 Free Spark quota, for reference: 1 GiB stored and 50,000 document reads a day. At about 350 KB per photo that is roughly 3,000 photos, and each photo viewed costs one read.
 

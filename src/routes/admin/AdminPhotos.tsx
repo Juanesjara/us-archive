@@ -1,78 +1,136 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState } from 'react'
+import { Timestamp } from 'firebase/firestore'
 import { useCollection } from '../../hooks/useCollection'
 import type { Photo } from '../../types'
-import { addPhoto, deletePhoto, updatePhoto } from '../../services/archive'
-import { TextField } from '../../components/ui/Field'
-import { ImagePicker } from '../../components/ui/ImagePicker'
+import { addPhoto, deletePhoto } from '../../services/archive'
 import { ArchiveImage } from '../../components/ui/ArchiveImage'
 import { EmptyState, ErrorNote, Loading } from '../../components/ui/EmptyState'
-import { formatShort, fromInputDate, toInputDate, todayInputDate } from '../../lib/format'
-import { AdminSection, Disclosure, FormFooter, Row, confirmDelete, useAction } from './shared'
+import { formatFull, formatTime, fromInputDate, todayInputDate } from '../../lib/format'
+import { readPhotoMeta, reverseGeocode } from '../../lib/photoMeta'
+import { groupIntoAlbums } from '../../lib/albums'
+import { AdminSection, Row, confirmDelete, errorMessage, useAction } from './shared'
 
-interface FormState {
-  date: string
-  caption: string
-  location: string
+type Status = 'waiting' | 'reading' | 'uploading' | 'done' | 'error'
+
+interface UploadItem {
+  id: string
+  name: string
+  status: Status
+  detail?: string
 }
 
-const empty = (): FormState => ({ date: todayInputDate(), caption: '', location: '' })
+const statusLabel: Record<Status, string> = {
+  waiting: 'En espera',
+  reading: 'Leyendo fecha y lugar',
+  uploading: 'Subiendo',
+  done: 'Lista',
+  error: 'No se pudo subir',
+}
 
-function PhotoForm({
-  initial,
-  withFile,
-  submitLabel,
-  onSubmit,
-  onCancel,
-}: {
-  initial: FormState
-  withFile: boolean
-  submitLabel: string
-  onSubmit: (state: FormState, file: File | null) => Promise<void>
-  onCancel: () => void
-}) {
-  const [state, setState] = useState<FormState>(initial)
-  const [file, setFile] = useState<File | null>(null)
-  const { busy, error, run } = useAction()
+/** Reads metadata, resolves the place and uploads one photo. Returns a short summary for the list. */
+async function uploadOne(file: File, onStatus: (s: Status) => void): Promise<string> {
+  onStatus('reading')
+  const meta = await readPhotoMeta(file)
+  const place = meta.lat != null && meta.lng != null ? await reverseGeocode(meta.lat, meta.lng) : null
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    if (withFile && !file) return
-    void run(() => onSubmit(state, file))
+  onStatus('uploading')
+  const date = meta.takenAt ? Timestamp.fromDate(meta.takenAt) : fromInputDate(todayInputDate())!
+  await addPhoto(file, {
+    date,
+    hasTime: meta.takenAt != null,
+    location: place?.label,
+    city: place?.city,
+    lat: meta.lat,
+    lng: meta.lng,
+  })
+
+  const when = meta.takenAt ? `${formatFull(meta.takenAt)}, ${formatTime(meta.takenAt)}` : 'Sin fecha en la foto, se usó hoy'
+  const where = place?.label ?? (meta.lat != null ? 'Lugar no encontrado' : 'Sin ubicación en la foto')
+  return `${when}
+${where}`
+}
+
+function Uploader() {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [items, setItems] = useState<UploadItem[]>([])
+  const busy = items.some((i) => i.status === 'waiting' || i.status === 'reading' || i.status === 'uploading')
+
+  const patch = (id: string, next: Partial<UploadItem>) =>
+    setItems((list) => list.map((i) => (i.id === id ? { ...i, ...next } : i)))
+
+  const start = async (files: File[]) => {
+    const batch = files.map((f, n) => ({ id: `${Date.now()}-${n}`, name: f.name, status: 'waiting' as Status }))
+    setItems(batch)
+    // One at a time: keeps memory low on phones and respects the geocoder's rate limit.
+    for (let n = 0; n < files.length; n++) {
+      const id = batch[n].id
+      try {
+        const detail = await uploadOne(files[n], (status) => patch(id, { status }))
+        patch(id, { status: 'done', detail })
+      } catch (err) {
+        patch(id, { status: 'error', detail: errorMessage(err) })
+      }
+    }
   }
 
+  const done = items.filter((i) => i.status === 'done').length
+
   return (
-    <form onSubmit={submit} className="flex flex-col gap-6">
-      {withFile ? <ImagePicker label="Imagen" file={file} onChange={setFile} required /> : null}
-      <TextField
-        label="Fecha"
-        type="date"
-        value={state.date}
-        onChange={(e) => setState({ ...state, date: e.target.value })}
-        required
+    <div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="sr-only"
+        aria-label="Elegir fotos"
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])]
+          e.target.value = ''
+          if (files.length) void start(files)
+        }}
       />
-      <TextField
-        label="Descripción (opcional)"
-        value={state.caption}
-        onChange={(e) => setState({ ...state, caption: e.target.value })}
-        maxLength={200}
-      />
-      <TextField
-        label="Lugar (opcional)"
-        value={state.location}
-        onChange={(e) => setState({ ...state, location: e.target.value })}
-        maxLength={120}
-      />
-      <FormFooter busy={busy} error={error} submitLabel={submitLabel} onCancel={onCancel} />
-    </form>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+        className="inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 text-ui font-medium text-paper transition-colors hover:bg-body disabled:pointer-events-none disabled:opacity-40"
+      >
+        {busy ? `Subiendo ${done + 1} de ${items.length}` : 'Subir fotos'}
+      </button>
+      <p className="mt-3 max-w-md text-meta text-muted">
+        Puedes elegir varias a la vez. La fecha, la hora y el lugar se leen de cada foto, y la galería las agrupa en
+        álbumes por día y lugar.
+      </p>
+
+      {items.length > 0 ? (
+        <ul className="mt-6 rounded-sm bg-well p-5 sm:p-6" aria-live="polite">
+          {items.map((i) => (
+            <li key={i.id} className="border-t border-rule py-3 first:border-t-0 first:pt-0 last:pb-0">
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="truncate text-ui text-ink">{i.name}</span>
+                <span className={`shrink-0 text-meta ${i.status === 'error' ? 'text-danger' : 'text-muted'}`}>
+                  {statusLabel[i.status]}
+                </span>
+              </div>
+              {i.detail ? (
+                <p className={`mt-1 whitespace-pre-line text-meta ${i.status === 'error' ? 'text-danger' : 'text-muted'}`}>
+                  {i.detail}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 
 export function AdminPhotos() {
   const { items, loading, error } = useCollection<Photo>('photos')
-  const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const del = useAction()
+  const albums = groupIntoAlbums(items)
 
   const onDelete = (photo: Photo) => {
     if (!confirmDelete('esta foto')) return
@@ -82,20 +140,7 @@ export function AdminPhotos() {
 
   return (
     <AdminSection title="Fotos">
-      <Disclosure label="Agregar foto" open={adding} onOpen={() => setAdding(true)}>
-        <PhotoForm
-          initial={empty()}
-          withFile
-          submitLabel="Agregar foto"
-          onCancel={() => setAdding(false)}
-          onSubmit={async (s, file) => {
-            const date = fromInputDate(s.date)
-            if (!date || !file) throw new Error('Elige una imagen y una fecha.')
-            await addPhoto(file, { date, caption: s.caption, location: s.location })
-            setAdding(false)
-          }}
-        />
-      </Disclosure>
+      <Uploader />
 
       {del.error ? (
         <p className="mt-6 text-meta text-danger" role="alert">
@@ -103,7 +148,7 @@ export function AdminPhotos() {
         </p>
       ) : null}
 
-      <div className="mt-10">
+      <div className="mt-12">
         {loading ? (
           <Loading />
         ) : error ? (
@@ -111,50 +156,39 @@ export function AdminPhotos() {
         ) : items.length === 0 ? (
           <EmptyState title="Todavía no hay fotos." />
         ) : (
-          <ul>
-            {items.map((photo) =>
-              editing === photo.id ? (
-                <li key={photo.id} className="border-t border-rule py-5 first:border-t-0">
-                  <PhotoForm
-                    initial={{
-                      date: toInputDate(photo.date),
-                      caption: photo.caption ?? '',
-                      location: photo.location ?? '',
-                    }}
-                    withFile={false}
-                    submitLabel="Guardar cambios"
-                    onCancel={() => setEditing(null)}
-                    onSubmit={async (s) => {
-                      const date = fromInputDate(s.date)
-                      if (!date) throw new Error('Elige una fecha.')
-                      await updatePhoto(photo.id, { date, caption: s.caption, location: s.location })
-                      setEditing(null)
-                    }}
-                  />
-                </li>
-              ) : (
-                <Row
-                  key={photo.id}
-                  onEdit={() => setEditing(photo.id)}
-                  onDelete={() => onDelete(photo)}
-                  deleting={deletingId === photo.id}
-                >
-                  <div className="flex gap-4">
-                    <ArchiveImage id={photo.imageId} ratio="1 / 1" className="h-16 w-16 shrink-0 rounded-sm object-cover" />
-                    <div className="min-w-0">
-                      <p className="serif truncate text-prose text-ink">{photo.caption || 'Sin descripción'}</p>
-                      <p className="text-meta text-muted">
-                        {formatShort(photo.date)}
-                        {photo.location ? `, ${photo.location}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                </Row>
-              ),
-            )}
-          </ul>
+          <div className="flex flex-col gap-10">
+            {albums.map((album) => (
+              <section key={album.key}>
+                <h2 className="text-meta text-muted">
+                  {formatFull(album.day)}
+                  {album.place ? `, ${album.place}` : ''}
+                </h2>
+                <ul className="mt-2">
+                  {album.photos.map((photo) => (
+                    <Row key={photo.id} onDelete={() => onDelete(photo)} deleting={deletingId === photo.id}>
+                      <div className="flex gap-4">
+                        <ArchiveImage
+                          id={photo.imageId}
+                          ratio="1 / 1"
+                          className="h-16 w-16 shrink-0 rounded-sm object-cover"
+                        />
+                        <div className="min-w-0">
+                          <p className="serif truncate text-prose text-ink">{photo.caption || 'Sin descripción'}</p>
+                          <p className="text-meta text-muted">
+                            {photo.hasTime ? formatTime(photo.date) : 'Sin hora'}
+                            {photo.location ? `, ${photo.location}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </Row>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
       </div>
+      <p className="mt-10 text-meta text-faint">Las descripciones se añaden desde la galería, abriendo cada foto.</p>
     </AdminSection>
   )
 }

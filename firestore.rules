@@ -56,13 +56,21 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    function optionalNumber(field) {
+      return !(field in data()) || data()[field] == null || data()[field] is number;
+    }
+
     match /photos/{id} {
       allow read: if isMember();
       allow create, update: if isAdmin()
         && data().imageId is string
         && data().date is timestamp
+        && (!('hasTime' in data()) || data().hasTime is bool)
         && optionalString('caption', 200)
-        && optionalString('location', 120);
+        && optionalString('location', 160)
+        && optionalString('city', 120)
+        && optionalNumber('lat')
+        && optionalNumber('lng');
       allow delete: if isAdmin();
     }
 
