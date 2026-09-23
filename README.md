@@ -90,7 +90,7 @@ No indexes are needed: every query orders by a single field.
 Cloud Storage needs the paid Blaze plan on new projects, so photos live in Firestore instead:
 
 - Before upload, the browser decodes the image, applies its EXIF rotation, resizes it to at most 1600 px on the long edge and re-encodes it as JPEG. If it is still too large it steps quality and size down until it fits one Firestore document (1 MiB). An iPhone photo of about 3 MB lands at roughly 250 to 450 KB. HEIC photos picked on an iPhone are converted along the way.
-- Each image is its own document in `images/{id}`. Photos, memories, places and the official state only store the id, so lists and counts never download image data. Images load one by one as they are shown and are cached for the session.
+- Each image is its own document in `images/{id}`. Photos and the official state only store the id, so lists and counts never download image data. Images load one by one as they are shown and are cached for the session.
 - Images are immutable. Replacing a photo stores a new image and deletes the old one. Deleting an entry deletes its image.
 - Images are protected by the same rules as everything else. There are no public URLs.
 - Uploading is a single step: pick one or many photos in `/admin/photos` and they upload right away. Before compressing, the app reads each file's metadata with `exifr`: the time it was taken and its GPS position. Coordinates are turned into a short place name ("El Poblado, Medellín") through OpenStreetMap's public Nominatim service, one request per second, cached. Photos without metadata get today's date and no place.
@@ -122,7 +122,7 @@ What they enforce:
 - Signed-in accounts without a `members/{uid}` document get nothing. They see an "This account isn't on the list" screen in the app.
 - Members can read every archive collection, including `images`.
 - Only `role == "admin"` can create, update or delete.
-- Writes are shape-checked: required fields, string length limits, timestamps where dates are expected, `things.category` limited to the five known values, and images must be JPEG data URLs under 1 MB. Images cannot be edited, only created and deleted.
+- Writes are shape-checked: required fields, string length limits, timestamps where dates are expected, and images must be JPEG data URLs under 1 MB. Images cannot be edited, only created and deleted.
 - `members` cannot be written from the client at all.
 - A final catch-all denies anything not listed.
 
@@ -161,7 +161,7 @@ src/
   components/layout/        AppShell (header + nav) and the closing FinalSection
   routes/Login.tsx
   routes/onboarding/        the three intro screens
-  routes/archive/           Home, Photos, Memories, Places, Things
+  routes/archive/           Home, Photos, Places, Place
   routes/OneMoreThing.tsx   the two closing screens
   routes/admin/             admin shell and one page per collection, plus Official
   routes/guards.tsx         RequireConfig, RequireAuth, RequireAdmin, RequireIntro
