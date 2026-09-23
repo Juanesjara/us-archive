@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { Photo } from '../../types'
 import { formatFull, formatTime } from '../../lib/format'
 import { useAuth } from '../../hooks/useAuth'
 import { setPhotoCaption } from '../../services/archive'
-import { ArchiveImage } from './ArchiveImage'
+import { loadImage, useImage } from './ArchiveImage'
 
 interface LightboxProps {
   photos: Photo[]
@@ -90,19 +91,29 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
     }
   }, [index, hasPrev, hasNext, onClose, onIndex])
 
+  // Warm up the neighbours so swiping through an album doesn't wait on each photo.
+  useEffect(() => {
+    for (const n of [index - 1, index + 1]) {
+      const id = photos[n]?.imageId
+      if (id) void loadImage(id)
+    }
+  }, [index, photos])
+
   if (!photo) return null
 
   const when = photo.hasTime ? `${formatFull(photo.date)}, ${formatTime(photo.date)}` : formatFull(photo.date)
 
-  return (
+  // Rendered into <body> so no ancestor (animations, transforms, overflow) can
+  // shift or clip it. Three rows: top bar, photo filling what is left, details.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={photo.caption || 'Foto'}
-      className="fixed inset-0 z-50 flex flex-col bg-paper"
+      className="fixed inset-0 z-50 grid h-dvh grid-rows-[auto_minmax(0,1fr)_auto] bg-paper"
       onClick={onClose}
     >
-      <div className="flex items-center justify-between px-6 py-5 sm:px-10">
+      <div className="flex items-center justify-between px-6 pb-3 pt-5 sm:px-10">
         <p className="text-meta text-muted">
           {index + 1} de {photos.length}
         </p>
@@ -111,16 +122,14 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center px-6 sm:px-10" onClick={(e) => e.stopPropagation()}>
-        <ArchiveImage
-          key={photo.imageId}
-          id={photo.imageId}
-          alt={photo.caption || ''}
-          className="max-h-full max-w-full object-contain"
-        />
+      <div className="relative mx-6 sm:mx-10" onClick={(e) => e.stopPropagation()}>
+        <LightboxImage key={photo.imageId} id={photo.imageId} alt={photo.caption || ''} />
       </div>
 
-      <div className="flex items-end justify-between gap-6 px-6 py-6 sm:px-10" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex items-end justify-between gap-6 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-10"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="min-w-0 flex-1">
           {editing ? (
             <CaptionEditor key={photo.id} photo={photo} onDone={() => setEditingId(null)} />
@@ -147,7 +156,7 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
               type="button"
               disabled={!hasPrev}
               onClick={() => onIndex(index - 1)}
-              className="text-ink hover:text-muted disabled:text-rule"
+              className="px-1 py-2 text-ink hover:text-muted disabled:text-rule"
               aria-label="Foto anterior"
             >
               ←
@@ -156,7 +165,7 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
               type="button"
               disabled={!hasNext}
               onClick={() => onIndex(index + 1)}
-              className="text-ink hover:text-muted disabled:text-rule"
+              className="px-1 py-2 text-ink hover:text-muted disabled:text-rule"
               aria-label="Foto siguiente"
             >
               →
@@ -164,6 +173,27 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
+}
+
+/** The photo fills the middle row and scales to fit; a quiet label shows while it loads. */
+function LightboxImage({ id, alt }: { id: string; alt: string }) {
+  const url = useImage(id)
+  if (url === undefined) {
+    return (
+      <p className="absolute inset-0 flex items-center justify-center text-meta text-faint" aria-live="polite">
+        Cargando
+      </p>
+    )
+  }
+  if (url === null) {
+    return (
+      <p className="absolute inset-0 flex items-center justify-center text-meta text-muted" role="alert">
+        No se pudo cargar esta foto.
+      </p>
+    )
+  }
+  return <img src={url} alt={alt} className="absolute inset-0 h-full w-full object-contain" />
 }

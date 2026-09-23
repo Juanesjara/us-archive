@@ -133,15 +133,18 @@
     opacity: 0.45;
   }
 
-  /* One entrance per screen. Nothing else moves on its own. */
+  /* One entrance per screen. Nothing else moves on its own.
+     fill-mode is "backwards", not "both": a transform left applied after the
+     animation would make this element the containing block for any
+     position: fixed descendant, pinning overlays to the page instead of the screen. */
   .enter {
-    animation: enter 560ms var(--ease-out-soft) both;
+    animation: enter 560ms var(--ease-out-soft) backwards;
   }
   .enter-late {
-    animation: enter 560ms var(--ease-out-soft) 140ms both;
+    animation: enter 560ms var(--ease-out-soft) 140ms backwards;
   }
   .enter-later {
-    animation: enter 560ms var(--ease-out-soft) 280ms both;
+    animation: enter 560ms var(--ease-out-soft) 280ms backwards;
   }
 }
 
