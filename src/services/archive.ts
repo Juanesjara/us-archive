@@ -114,6 +114,15 @@ export async function setPhotoCaption(id: string, caption: string) {
   await updateDoc(doc(getDb(), 'photos', id), { caption: caption.trim() || null })
 }
 
+/** Admin edits after upload: description, and the date and time the photo was taken. */
+export async function updatePhotoDetails(id: string, input: { caption: string; date: Timestamp; hasTime: boolean }) {
+  await updateDoc(doc(getDb(), 'photos', id), {
+    caption: input.caption.trim() || null,
+    date: input.date,
+    hasTime: input.hasTime,
+  })
+}
+
 export async function deletePhoto(id: string, imageId: string) {
   await deleteDoc(doc(getDb(), 'photos', id))
   await deleteImage(imageId)

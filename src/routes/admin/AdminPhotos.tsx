@@ -2,10 +2,19 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Timestamp } from 'firebase/firestore'
 import { useCollection } from '../../hooks/useCollection'
 import type { Photo } from '../../types'
-import { addPhoto, deletePhoto, setPhotoCaption } from '../../services/archive'
+import { addPhoto, deletePhoto, updatePhotoDetails } from '../../services/archive'
 import { ArchiveImage } from '../../components/ui/ArchiveImage'
 import { EmptyState, ErrorNote, Loading } from '../../components/ui/EmptyState'
-import { formatFull, formatTime, fromInputDate, todayInputDate } from '../../lib/format'
+import {
+  formatFull,
+  formatTime,
+  fromInputDate,
+  fromInputDateTime,
+  toInputDate,
+  toInputTime,
+  todayInputDate,
+} from '../../lib/format'
+import { TextField } from '../../components/ui/Field'
 import { readPhotoMeta, reverseGeocode } from '../../lib/photoMeta'
 import { groupIntoAlbums } from '../../lib/albums'
 import { AdminSection, Row, confirmDelete, errorMessage, useAction } from './shared'
@@ -126,32 +135,42 @@ function Uploader() {
   )
 }
 
-function CaptionField({ photo, onDone }: { photo: Photo; onDone: () => void }) {
-  const [value, setValue] = useState(photo.caption ?? '')
+function PhotoDetailsForm({ photo, onDone }: { photo: Photo; onDone: () => void }) {
+  const [caption, setCaption] = useState(photo.caption ?? '')
+  const [date, setDate] = useState(toInputDate(photo.date))
+  const [clock, setClock] = useState(photo.hasTime ? toInputTime(photo.date) : '')
   const { busy, error, run } = useAction()
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    void run(() => setPhotoCaption(photo.id, value), onDone)
+    void run(async () => {
+      const stamp = fromInputDateTime(date, clock)
+      if (!stamp) throw new Error('Elige una fecha.')
+      await updatePhotoDetails(photo.id, { caption, date: stamp, hasTime: Boolean(clock) })
+    }, onDone)
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <label className="sr-only" htmlFor={`caption-${photo.id}`}>
-        Descripción
-      </label>
-      <input
-        id={`caption-${photo.id}`}
-        className="field serif text-prose"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onDone()
-        }}
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-4"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onDone()
+      }}
+    >
+      <TextField
+        label="Descripción (opcional)"
+        className="serif text-prose"
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
         placeholder="Escribe una descripción"
         maxLength={200}
         autoFocus
       />
+      <div className="grid grid-cols-[3fr_2fr] gap-4">
+        <TextField label="Fecha" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        <TextField label="Hora (opcional)" type="time" value={clock} onChange={(e) => setClock(e.target.value)} />
+      </div>
       {error ? (
         <p className="text-meta text-danger" role="alert">
           {error}
@@ -223,7 +242,7 @@ export function AdminPhotos() {
                         />
                         <div className="min-w-0 flex-1">
                           {editingId === photo.id ? (
-                            <CaptionField photo={photo} onDone={() => setEditingId(null)} />
+                            <PhotoDetailsForm photo={photo} onDone={() => setEditingId(null)} />
                           ) : (
                             <p className={`serif truncate text-prose ${photo.caption ? 'text-ink' : 'text-faint'}`}>
                               {photo.caption || 'Sin descripción'}
@@ -244,7 +263,7 @@ export function AdminPhotos() {
         )}
       </div>
       <p className="mt-10 text-meta text-faint">
-        La descripción se edita aquí con "Editar" o desde la galería, abriendo cada foto.
+        Con "Editar" cambias la descripción, la fecha y la hora. La descripción también se puede editar desde la galería.
       </p>
     </AdminSection>
   )
