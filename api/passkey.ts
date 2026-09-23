@@ -16,9 +16,8 @@
  * Without it, status reports enabled: false and the UI hides the Face ID buttons.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { cert, getApps, initializeApp, type App } from 'firebase-admin/app'
-import { getAuth } from 'firebase-admin/auth'
-import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore'
+import type { Auth } from 'firebase-admin/auth'
+import type { Firestore } from 'firebase-admin/firestore'
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -36,15 +35,34 @@ const PRIMARY_DOMAIN = 'alejayjuanesgallery.site'
 /* Firebase Admin                                                           */
 /* ------------------------------------------------------------------------ */
 
-function adminApp(): App | null {
-  if (getApps().length) return getApps()[0]
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT
-  if (!raw) return null
-  try {
-    return initializeApp({ credential: cert(JSON.parse(raw)) })
-  } catch {
+/*
+ * firebase-admin is loaded lazily, only when credentials exist, so the status
+ * check can never fail because of the Admin SDK or its dependencies.
+ */
+type FirestoreModule = typeof import('firebase-admin/firestore')
+let admin: Promise<{ auth: Auth; db: Firestore; fs: FirestoreModule } | null> | null = null
+
+function loadAdmin() {
+  admin ??= (async () => {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT
+    if (!raw) return null
+    const { cert, getApps, initializeApp } = await import('firebase-admin/app')
+    const app = getApps()[0] ?? initializeApp({ credential: cert(JSON.parse(raw)) })
+    const { getAuth } = await import('firebase-admin/auth')
+    const fs = await import('firebase-admin/firestore')
+    return { auth: getAuth(app), db: fs.getFirestore(app), fs }
+  })().catch((err) => {
+    console.error('[passkey] admin init failed', err)
+    admin = null
     return null
-  }
+  })
+  return admin
+}
+
+async function need() {
+  const a = await loadAdmin()
+  if (!a) throw new HttpError(503, 'Face ID no está configurado en el servidor.')
+  return a
 }
 
 /* ------------------------------------------------------------------------ */
@@ -79,24 +97,25 @@ async function requireUser(req: VercelRequest) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : ''
   if (!token) throw new HttpError(401, 'Inicia sesión primero.')
   try {
-    return await getAuth().verifyIdToken(token)
+    return await (await need()).auth.verifyIdToken(token)
   } catch {
     throw new HttpError(401, 'La sesión expiró. Vuelve a entrar.')
   }
 }
 
 async function isMember(uid: string) {
-  const snap = await getFirestore().doc(`members/${uid}`).get()
+  const snap = await (await need()).db.doc(`members/${uid}`).get()
   return snap.exists
 }
 
 async function saveChallenge(challenge: string, kind: 'register' | 'login', uid?: string) {
-  const ref = getFirestore().collection('passkeyChallenges').doc()
+  const { db, fs } = await need()
+  const ref = db.collection('passkeyChallenges').doc()
   await ref.set({
     challenge,
     kind,
     uid: uid ?? null,
-    expiresAt: Timestamp.fromMillis(Date.now() + CHALLENGE_TTL_MS),
+    expiresAt: fs.Timestamp.fromMillis(Date.now() + CHALLENGE_TTL_MS),
   })
   return ref.id
 }
@@ -104,13 +123,13 @@ async function saveChallenge(challenge: string, kind: 'register' | 'login', uid?
 /** Reads and deletes a challenge in one go, so it can only be used once. */
 async function takeChallenge(id: unknown, kind: 'register' | 'login', uid?: string) {
   if (typeof id !== 'string' || !id) throw new HttpError(400, 'Falta el desafío.')
-  const db = getFirestore()
+  const { db } = await need()
   const ref = db.collection('passkeyChallenges').doc(id)
   const data = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref)
     if (!snap.exists) return null
     tx.delete(ref)
-    return snap.data() as { challenge: string; kind: string; uid: string | null; expiresAt: Timestamp }
+    return snap.data() as { challenge: string; kind: string; uid: string | null; expiresAt: { toMillis(): number } }
   })
   if (!data || data.kind !== kind || data.expiresAt.toMillis() < Date.now()) {
     throw new HttpError(400, 'El intento expiró. Inténtalo de nuevo.')
@@ -136,7 +155,7 @@ async function registerOptions(req: VercelRequest) {
   const user = await requireUser(req)
   if (!(await isMember(user.uid))) throw new HttpError(403, 'Esta cuenta no está en la lista.')
   const { rpID } = relyingParty(req)
-  const existing = await getFirestore().collection('passkeys').where('uid', '==', user.uid).get()
+  const existing = await (await need()).db.collection('passkeys').where('uid', '==', user.uid).get()
   const name = (user.email ?? user.uid).split('@')[0]
 
   const options = await generateRegistrationOptions({
@@ -187,10 +206,11 @@ async function registerVerify(req: VercelRequest) {
     rpID,
     device: typeof device === 'string' ? device.slice(0, 80) : undefined,
   }
-  await getFirestore()
+  const { db, fs } = await need()
+  await db
     .collection('passkeys')
     .doc(credential.id)
-    .set({ ...stored, createdAt: FieldValue.serverTimestamp() })
+    .set({ ...stored, createdAt: fs.FieldValue.serverTimestamp() })
   return { ok: true }
 }
 
@@ -207,7 +227,8 @@ async function loginVerify(req: VercelRequest) {
   const expectedChallenge = await takeChallenge(challengeId, 'login')
   if (!response?.id) throw new HttpError(400, 'Respuesta incompleta.')
 
-  const ref = getFirestore().collection('passkeys').doc(response.id)
+  const { db, fs, auth } = await need()
+  const ref = db.collection('passkeys').doc(response.id)
   const snap = await ref.get()
   if (!snap.exists) throw new HttpError(404, 'Este Face ID no está registrado. Entra con tu contraseña y actívalo de nuevo.')
   const stored = snap.data() as StoredPasskey
@@ -229,8 +250,8 @@ async function loginVerify(req: VercelRequest) {
   if (!result.verified) throw new HttpError(401, 'No se pudo verificar el Face ID.')
   if (!(await isMember(stored.uid))) throw new HttpError(403, 'Esta cuenta no está en la lista.')
 
-  await ref.update({ counter: result.authenticationInfo.newCounter, lastUsedAt: FieldValue.serverTimestamp() })
-  const token = await getAuth().createCustomToken(stored.uid)
+  await ref.update({ counter: result.authenticationInfo.newCounter, lastUsedAt: fs.FieldValue.serverTimestamp() })
+  const token = await auth.createCustomToken(stored.uid)
   return { token }
 }
 
@@ -240,7 +261,7 @@ async function loginVerify(req: VercelRequest) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store')
-  const configured = adminApp() !== null
+  const configured = Boolean(process.env.FIREBASE_SERVICE_ACCOUNT)
   const action = req.method === 'GET' ? 'status' : (req.body as { action?: string } | undefined)?.action
 
   if (action === 'status') return res.status(200).json({ enabled: configured })
