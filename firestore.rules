@@ -74,37 +74,6 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /memories/{id} {
-      allow read: if isMember();
-      allow create, update: if isAdmin()
-        && data().title is string && data().title.size() <= 120
-        && data().date is timestamp
-        && optionalString('description', 2000)
-        && optionalString('location', 120)
-        && optionalId('photoId');
-      allow delete: if isAdmin();
-    }
-
-    match /places/{id} {
-      allow read: if isMember();
-      allow create, update: if isAdmin()
-        && data().name is string && data().name.size() <= 120
-        && data().date is timestamp
-        && optionalString('note', 1000)
-        && optionalId('photoId');
-      allow delete: if isAdmin();
-    }
-
-    match /things/{id} {
-      allow read: if isMember();
-      allow create, update: if isAdmin()
-        && data().title is string && data().title.size() <= 120
-        && data().category in ['games', 'books', 'movies', 'songs', 'random']
-        && optionalString('note', 1000)
-        && (!('date' in data()) || data().date == null || data().date is timestamp);
-      allow delete: if isAdmin();
-    }
-
     match /settings/official {
       allow read: if isMember();
       allow write: if isAdmin()

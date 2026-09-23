@@ -3,10 +3,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { Wordmark } from '../ui/Wordmark'
 
 const nav = [
-  { to: '/archive/memories', label: 'Recuerdos' },
   { to: '/archive/photos', label: 'Fotos' },
   { to: '/archive/places', label: 'Lugares' },
-  { to: '/archive/things', label: 'Cosas' },
 ]
 
 export function AppShell() {

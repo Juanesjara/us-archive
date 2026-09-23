@@ -38,7 +38,7 @@ export function IntroWhy() {
 }
 
 /* Screen 3: what is inside */
-const inside = ['Recuerdos', 'Fotos', 'Lugares', 'Cosas']
+const inside = ['Fotos', 'Lugares']
 
 export function IntroInside() {
   const navigate = useNavigate()

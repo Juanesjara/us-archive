@@ -1,7 +1,8 @@
 import { Link } from 'react-router'
 import { useCollection, useDocument } from '../../hooks/useCollection'
 import { OFFICIAL_PATH } from '../../services/archive'
-import type { Memory, OfficialState, Photo, Place, Thing } from '../../types'
+import type { OfficialState, Photo } from '../../types'
+import { groupByPlace } from '../../lib/places'
 import { Wordmark } from '../../components/ui/Wordmark'
 import { FinalSection } from '../../components/layout/FinalSection'
 import { formatFull } from '../../lib/format'
@@ -35,16 +36,11 @@ function OfficialMemory({ official }: { official: OfficialState }) {
 
 export function Home() {
   const photos = useCollection<Photo>('photos')
-  const memories = useCollection<Memory>('memories')
-  const places = useCollection<Place>('places')
-  const things = useCollection<Thing>('things', 'createdAt')
   const { data: official } = useDocument<OfficialState>(OFFICIAL_PATH)
 
   const stats = [
     { label: 'Fotos', value: photos.items.length, to: '/archive/photos', loading: photos.loading },
-    { label: 'Recuerdos', value: memories.items.length, to: '/archive/memories', loading: memories.loading },
-    { label: 'Lugares', value: places.items.length, to: '/archive/places', loading: places.loading },
-    { label: 'Cosas', value: things.items.length, to: '/archive/things', loading: things.loading },
+    { label: 'Lugares', value: groupByPlace(photos.items).length, to: '/archive/places', loading: photos.loading },
   ]
 
   return (
@@ -52,7 +48,7 @@ export function Home() {
       <Wordmark className="text-display sm:text-[6rem]" />
       <p className="mt-3 text-ui text-muted">Archivo privado</p>
 
-      <div className="mt-16 grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
+      <div className="mt-16 grid max-w-md grid-cols-2 gap-x-8 gap-y-10">
         {stats.map((s) => (
           <Stat key={s.label} {...s} />
         ))}

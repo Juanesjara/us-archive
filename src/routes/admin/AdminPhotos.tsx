@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Timestamp } from 'firebase/firestore'
 import { useCollection } from '../../hooks/useCollection'
 import type { Photo } from '../../types'
-import { addPhoto, deletePhoto } from '../../services/archive'
+import { addPhoto, deletePhoto, setPhotoCaption } from '../../services/archive'
 import { ArchiveImage } from '../../components/ui/ArchiveImage'
 import { EmptyState, ErrorNote, Loading } from '../../components/ui/EmptyState'
 import { formatFull, formatTime, fromInputDate, todayInputDate } from '../../lib/format'
@@ -126,9 +126,53 @@ function Uploader() {
   )
 }
 
+function CaptionField({ photo, onDone }: { photo: Photo; onDone: () => void }) {
+  const [value, setValue] = useState(photo.caption ?? '')
+  const { busy, error, run } = useAction()
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    void run(() => setPhotoCaption(photo.id, value), onDone)
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <label className="sr-only" htmlFor={`caption-${photo.id}`}>
+        Descripción
+      </label>
+      <input
+        id={`caption-${photo.id}`}
+        className="field serif text-prose"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onDone()
+        }}
+        placeholder="Escribe una descripción"
+        maxLength={200}
+        autoFocus
+      />
+      {error ? (
+        <p className="text-meta text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex gap-5 text-meta">
+        <button type="submit" disabled={busy} className="text-ink hover:text-muted disabled:opacity-40">
+          {busy ? 'Guardando' : 'Guardar'}
+        </button>
+        <button type="button" onClick={onDone} disabled={busy} className="text-muted hover:text-ink">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export function AdminPhotos() {
   const { items, loading, error } = useCollection<Photo>('photos')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const del = useAction()
   const albums = groupIntoAlbums(items)
 
@@ -165,15 +209,26 @@ export function AdminPhotos() {
                 </h2>
                 <ul className="mt-2">
                   {album.photos.map((photo) => (
-                    <Row key={photo.id} onDelete={() => onDelete(photo)} deleting={deletingId === photo.id}>
+                    <Row
+                      key={photo.id}
+                      onEdit={editingId === photo.id ? undefined : () => setEditingId(photo.id)}
+                      onDelete={() => onDelete(photo)}
+                      deleting={deletingId === photo.id}
+                    >
                       <div className="flex gap-4">
                         <ArchiveImage
                           id={photo.imageId}
                           ratio="1 / 1"
                           className="h-16 w-16 shrink-0 rounded-sm object-cover"
                         />
-                        <div className="min-w-0">
-                          <p className="serif truncate text-prose text-ink">{photo.caption || 'Sin descripción'}</p>
+                        <div className="min-w-0 flex-1">
+                          {editingId === photo.id ? (
+                            <CaptionField photo={photo} onDone={() => setEditingId(null)} />
+                          ) : (
+                            <p className={`serif truncate text-prose ${photo.caption ? 'text-ink' : 'text-faint'}`}>
+                              {photo.caption || 'Sin descripción'}
+                            </p>
+                          )}
                           <p className="text-meta text-muted">
                             {photo.hasTime ? formatTime(photo.date) : 'Sin hora'}
                             {photo.location ? `, ${photo.location}` : ''}
@@ -188,7 +243,9 @@ export function AdminPhotos() {
           </div>
         )}
       </div>
-      <p className="mt-10 text-meta text-faint">Las descripciones se añaden desde la galería, abriendo cada foto.</p>
+      <p className="mt-10 text-meta text-faint">
+        La descripción se edita aquí con "Editar" o desde la galería, abriendo cada foto.
+      </p>
     </AdminSection>
   )
 }

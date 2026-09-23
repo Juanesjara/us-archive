@@ -32,45 +32,6 @@ export interface Photo {
   createdAt?: Timestamp
 }
 
-export interface Memory {
-  id: string
-  date: Timestamp
-  title: string
-  description?: string
-  location?: string
-  photoId?: string | null
-  createdAt?: Timestamp
-}
-
-export interface Place {
-  id: string
-  name: string
-  date: Timestamp
-  note?: string
-  photoId?: string | null
-  createdAt?: Timestamp
-}
-
-export const THING_CATEGORIES = ['games', 'books', 'movies', 'songs', 'random'] as const
-export type ThingCategory = (typeof THING_CATEGORIES)[number]
-
-export const THING_LABELS: Record<ThingCategory, string> = {
-  games: 'Juegos',
-  books: 'Libros',
-  movies: 'Películas',
-  songs: 'Canciones',
-  random: 'Otros',
-}
-
-export interface Thing {
-  id: string
-  title: string
-  category: ThingCategory
-  note?: string
-  date?: Timestamp | null
-  createdAt?: Timestamp
-}
-
 /** settings/official: the state switched on after the question is asked in person. */
 export interface OfficialState {
   active: boolean

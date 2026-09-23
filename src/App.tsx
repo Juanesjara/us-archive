@@ -6,15 +6,11 @@ import { IntroInside, IntroStart, IntroWhy } from './routes/onboarding/Intro'
 import { AppShell } from './components/layout/AppShell'
 import { Home } from './routes/archive/Home'
 import { Photos } from './routes/archive/Photos'
-import { Memories } from './routes/archive/Memories'
 import { Places } from './routes/archive/Places'
-import { Things } from './routes/archive/Things'
+import { Place } from './routes/archive/Place'
 import { LookAtMe, OneMoreThing } from './routes/OneMoreThing'
 import { AdminShell } from './routes/admin/AdminShell'
 import { AdminPhotos } from './routes/admin/AdminPhotos'
-import { AdminMemories } from './routes/admin/AdminMemories'
-import { AdminPlaces } from './routes/admin/AdminPlaces'
-import { AdminThings } from './routes/admin/AdminThings'
 import { AdminOfficial } from './routes/admin/AdminOfficial'
 
 export default function App() {
@@ -63,9 +59,8 @@ export default function App() {
             >
               <Route index element={<Home />} />
               <Route path="photos" element={<Photos />} />
-              <Route path="memories" element={<Memories />} />
               <Route path="places" element={<Places />} />
-              <Route path="things" element={<Things />} />
+              <Route path="places/:slug" element={<Place />} />
             </Route>
 
             <Route
@@ -97,9 +92,6 @@ export default function App() {
             >
               <Route index element={<Navigate to="photos" replace />} />
               <Route path="photos" element={<AdminPhotos />} />
-              <Route path="memories" element={<AdminMemories />} />
-              <Route path="places" element={<AdminPlaces />} />
-              <Route path="things" element={<AdminThings />} />
               <Route path="official" element={<AdminOfficial />} />
             </Route>
 

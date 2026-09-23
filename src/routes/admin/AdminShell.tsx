@@ -4,9 +4,6 @@ import { resetIntro } from '../../lib/onboarding'
 
 const nav = [
   { to: '/admin/photos', label: 'Fotos' },
-  { to: '/admin/memories', label: 'Recuerdos' },
-  { to: '/admin/places', label: 'Lugares' },
-  { to: '/admin/things', label: 'Cosas' },
   { to: '/admin/official', label: 'Oficial' },
 ]
 

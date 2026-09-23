@@ -1,6 +1,6 @@
 # us.
 
-A private archive for two people: photos, memories, places and things. React, Vite, TypeScript, Tailwind and Firebase, deployed on Vercel.
+A private archive for two people: photos, grouped into albums and places. React, Vite, TypeScript, Tailwind and Firebase, deployed on Vercel.
 
 Everything private lives behind Firebase Authentication plus Firestore security rules. It runs on the free **Spark** plan: photos are compressed in the browser and stored inside Firestore, so Cloud Storage and a billing account are not needed. Only accounts listed in the `members` collection can read the archive, and only accounts with the `admin` role can write to it.
 
@@ -81,9 +81,6 @@ The remaining collections are created automatically the first time you add somet
 | ------------------- | ------------------------------------------------------------------ |
 | `images`            | One compressed JPEG per document, as a data URL. `data`, `width`, `height` |
 | `photos`            | Gallery. `imageId`, `date`, `caption?`, `location?`                 |
-| `memories`          | Timeline. `date`, `title`, `description?`, `location?`, `photoId?`  |
-| `places`            | `name`, `date`, `note?`, `photoId?`                                 |
-| `things`            | `title`, `category` (games, books, movies, songs, random), `note?`, `date?` |
 | `settings/official` | On/off switch and photo for the "Nuevo recuerdo agregado." block on the home page |
 
 No indexes are needed: every query orders by a single field.
@@ -98,7 +95,8 @@ Cloud Storage needs the paid Blaze plan on new projects, so photos live in Fires
 - Images are protected by the same rules as everything else. There are no public URLs.
 - Uploading is a single step: pick one or many photos in `/admin/photos` and they upload right away. Before compressing, the app reads each file's metadata with `exifr`: the time it was taken and its GPS position. Coordinates are turned into a short place name ("El Poblado, Medellín") through OpenStreetMap's public Nominatim service, one request per second, cached. Photos without metadata get today's date and no place.
 - The gallery groups photos into albums by local day and city automatically. There is nothing to name or manage.
-- A description is optional and added afterwards: open a photo in the gallery and use "Añadir descripción" (admins only).
+- Lugares is derived from the same data: one entry per city or town with photos, and inside it the photos grouped by neighbourhood. Photos without a location only appear in Fotos.
+- A description is optional and added afterwards, either from the photo viewer ("Añadir descripción") or from the admin list ("Editar"). Admins only.
 - On an iPhone, the photo picker may leave out the location. If photos arrive without a place, tap "Opciones" at the top of the picker and turn on location.
 
 Free Spark quota, for reference: 1 GiB stored and 50,000 document reads a day. At about 350 KB per photo that is roughly 3,000 photos, and each photo viewed costs one read.

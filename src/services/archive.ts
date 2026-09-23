@@ -11,7 +11,7 @@ import {
 import { getDb } from '../lib/firebase'
 import { compressImage } from '../lib/compress'
 import { forgetImage } from '../components/ui/ArchiveImage'
-import type { OfficialState, ThingCategory } from '../types'
+import type { OfficialState } from '../types'
 
 /* ------------------------------------------------------------------------ */
 /* Images                                                                   */
@@ -117,124 +117,6 @@ export async function setPhotoCaption(id: string, caption: string) {
 export async function deletePhoto(id: string, imageId: string) {
   await deleteDoc(doc(getDb(), 'photos', id))
   await deleteImage(imageId)
-}
-
-/* ------------------------------------------------------------------------ */
-/* Memories                                                                 */
-/* ------------------------------------------------------------------------ */
-
-export interface MemoryInput {
-  date: Timestamp
-  title: string
-  description?: string
-  location?: string
-}
-
-export async function addMemory(input: MemoryInput, photo?: File | null) {
-  await withImage(photo, (photoId) =>
-    addDoc(collection(getDb(), 'memories'), {
-      ...clean({ description: input.description, location: input.location }),
-      title: input.title.trim(),
-      date: input.date,
-      ...(photoId ? { photoId } : {}),
-      createdAt: serverTimestamp(),
-    }),
-  )
-}
-
-export async function updateMemory(
-  id: string,
-  input: MemoryInput,
-  photo: File | null | undefined,
-  previousPhotoId: string | null | undefined,
-  removePhoto: boolean,
-) {
-  await withImage(photo, async (photoId) => {
-    const patch: Record<string, unknown> = {
-      title: input.title.trim(),
-      date: input.date,
-      description: input.description?.trim() || null,
-      location: input.location?.trim() || null,
-    }
-    if (photoId) patch.photoId = photoId
-    else if (removePhoto) patch.photoId = null
-    await updateDoc(doc(getDb(), 'memories', id), patch)
-  })
-  if ((photo || removePhoto) && previousPhotoId) await deleteImage(previousPhotoId)
-}
-
-export async function deleteMemory(id: string, photoId?: string | null) {
-  await deleteDoc(doc(getDb(), 'memories', id))
-  await deleteImage(photoId)
-}
-
-/* ------------------------------------------------------------------------ */
-/* Places                                                                   */
-/* ------------------------------------------------------------------------ */
-
-export interface PlaceInput {
-  name: string
-  date: Timestamp
-  note?: string
-}
-
-export async function addPlace(input: PlaceInput, photo?: File | null) {
-  await withImage(photo, (photoId) =>
-    addDoc(collection(getDb(), 'places'), {
-      ...clean({ note: input.note }),
-      name: input.name.trim(),
-      date: input.date,
-      ...(photoId ? { photoId } : {}),
-      createdAt: serverTimestamp(),
-    }),
-  )
-}
-
-export async function updatePlace(id: string, input: PlaceInput) {
-  await updateDoc(doc(getDb(), 'places', id), {
-    name: input.name.trim(),
-    date: input.date,
-    note: input.note?.trim() || null,
-  })
-}
-
-export async function deletePlace(id: string, photoId?: string | null) {
-  await deleteDoc(doc(getDb(), 'places', id))
-  await deleteImage(photoId)
-}
-
-/* ------------------------------------------------------------------------ */
-/* Things                                                                   */
-/* ------------------------------------------------------------------------ */
-
-export interface ThingInput {
-  title: string
-  category: ThingCategory
-  note?: string
-  date?: Timestamp | null
-}
-
-export async function addThing(input: ThingInput) {
-  await addDoc(collection(getDb(), 'things'), {
-    ...clean({ note: input.note }),
-    title: input.title.trim(),
-    category: input.category,
-    ...(input.date ? { date: input.date } : {}),
-    createdAt: serverTimestamp(),
-  })
-}
-
-export async function updateThing(id: string, input: ThingInput) {
-  await updateDoc(doc(getDb(), 'things', id), {
-    title: input.title.trim(),
-    category: input.category,
-    note: input.note?.trim() || null,
-    date: input.date ?? null,
-  })
-}
-
-export async function deleteThing(id: string) {
-  await deleteDoc(doc(getDb(), 'things', id))
 }
 
 /* ------------------------------------------------------------------------ */
