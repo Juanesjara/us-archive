@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../hooks/useAuth'
 import { hasSeenIntro } from '../lib/onboarding'
 import { nameToEmail, normalizeName } from '../lib/username'
+import { passkeysAvailable, signInWithPasskey } from '../lib/passkey'
 import { Screen } from '../components/ui/Screen'
 import { Wordmark } from '../components/ui/Wordmark'
 import { TextField } from '../components/ui/Field'
@@ -32,11 +33,31 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [faceId, setFaceId] = useState(false)
+  const [faceIdError, setFaceIdError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void passkeysAvailable().then(setFaceId)
+  }, [])
 
   if (loading) return <div className="min-h-dvh" aria-busy="true" />
   if (user) {
     const from = (location.state as { from?: string } | null)?.from
     return <Navigate to={from ?? (hasSeenIntro() ? '/archive' : '/intro')} replace />
+  }
+
+  const onFaceId = async () => {
+    setFaceIdError(null)
+    setBusy(true)
+    try {
+      await signInWithPasskey()
+      const from = (location.state as { from?: string } | null)?.from
+      navigate(from ?? (hasSeenIntro() ? '/archive' : '/intro'), { replace: true })
+    } catch (err) {
+      setFaceIdError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const onSubmit = async (e: FormEvent) => {
@@ -89,6 +110,19 @@ export function Login() {
           </Button>
         </div>
       </form>
+
+      {faceId ? (
+        <div className="mt-10 w-full border-t border-rule pt-8">
+          <Button variant="quiet" onClick={() => void onFaceId()} disabled={busy}>
+            Entrar con Face ID
+          </Button>
+          {faceIdError ? (
+            <p className="mt-2 text-meta text-danger" role="alert">
+              {faceIdError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </Screen>
   )
 }

@@ -137,6 +137,20 @@ npm run lint      # oxlint
 
 The intro is shown once per device. To see it again, open the admin section and use "Replay the intro on this device" at the bottom, or clear the `us.intro.seen` key from localStorage.
 
+## Face ID sign-in (passkeys)
+
+`api/passkey.ts` is a Vercel function that lets each person turn on Face ID (or Touch ID / Windows Hello) once per device and then sign in with it, without typing a password. It verifies the passkey signature with `@simplewebauthn/server` and hands the browser a Firebase custom token.
+
+It needs one secret, only in Vercel, never in the repo:
+
+1. Firebase console, **Project settings**, **Service accounts**, **Generate new private key**. A JSON file downloads.
+2. Vercel, project **us-archive**, **Settings**, **Environment Variables**. Add `FIREBASE_SERVICE_ACCOUNT` for Production, paste the whole JSON as the value, and mark it **Sensitive**.
+3. Redeploy (push any commit, or **Deployments**, **Redeploy**).
+
+Until that variable exists, `GET /api/passkey` answers `{ "enabled": false }` and the app hides every Face ID button. Once it exists, a "Face ID" link appears in the header on devices that support it; after enabling it there, the sign-in screen shows "Entrar con Face ID".
+
+Passkeys belong to the domain they were created on. Ones created on alejayjuanesgallery.site work on both the apex and www, but not on the vercel.app address. Credentials and one-time challenges are stored in the `passkeys` and `passkeyChallenges` collections, which the Firestore rules close to every client; only the function can use them.
+
 ## Vercel deployment
 
 1. Push the project to a Git repository and import it in Vercel. The framework preset is **Vite**; the defaults (`npm run build`, output `dist`) are right.

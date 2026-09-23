@@ -8,6 +8,7 @@ import { Home } from './routes/archive/Home'
 import { Photos } from './routes/archive/Photos'
 import { Places } from './routes/archive/Places'
 import { Place } from './routes/archive/Place'
+import { FaceId } from './routes/archive/FaceId'
 import { LookAtMe, OneMoreThing } from './routes/OneMoreThing'
 import { AdminShell } from './routes/admin/AdminShell'
 import { AdminPhotos } from './routes/admin/AdminPhotos'
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="photos" element={<Photos />} />
               <Route path="places" element={<Places />} />
               <Route path="places/:slug" element={<Place />} />
+              <Route path="face-id" element={<FaceId />} />
             </Route>
 
             <Route

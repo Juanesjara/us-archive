@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router'
+import { passkeysAvailable } from '../../lib/passkey'
 import { useAuth } from '../../hooks/useAuth'
 import { Wordmark } from '../ui/Wordmark'
 
@@ -9,6 +11,10 @@ const nav = [
 
 export function AppShell() {
   const { isAdmin, signOut } = useAuth()
+  const [faceId, setFaceId] = useState(false)
+  useEffect(() => {
+    void passkeysAvailable().then(setFaceId)
+  }, [])
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -18,6 +24,11 @@ export function AppShell() {
             <Wordmark />
           </Link>
           <div className="flex items-baseline gap-5 text-meta text-muted">
+            {faceId ? (
+              <NavLink to="/archive/face-id" className={({ isActive }) => (isActive ? 'text-ink' : 'hover:text-ink')}>
+                Face ID
+              </NavLink>
+            ) : null}
             {isAdmin ? (
               <NavLink to="/admin" className={({ isActive }) => (isActive ? 'text-ink' : 'hover:text-ink')}>
                 Administrar
