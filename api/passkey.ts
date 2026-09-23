@@ -16,8 +16,8 @@
  * Without it, status reports enabled: false and the UI hides the Face ID buttons.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import type { Auth } from 'firebase-admin/auth'
 import type { Firestore } from 'firebase-admin/firestore'
+import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from 'jose'
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -36,23 +36,69 @@ const PRIMARY_DOMAIN = 'alejayjuanesgallery.site'
 /* ------------------------------------------------------------------------ */
 
 /*
- * firebase-admin is loaded lazily, only when credentials exist, so the status
- * check can never fail because of the Admin SDK or its dependencies.
+ * Only firebase-admin/app and /firestore are used. firebase-admin/auth is
+ * avoided on purpose: it pulls in jwks-rsa, which require()s the ESM-only
+ * jose and crashes on Vercel's function loader. ID tokens are verified and
+ * custom tokens are signed with jose directly, following Firebase's documented
+ * formats. Everything loads lazily so the status check never depends on it.
  */
 type FirestoreModule = typeof import('firebase-admin/firestore')
-let admin: Promise<{ auth: Auth; db: Firestore; fs: FirestoreModule } | null> | null = null
+
+interface ServiceAccount {
+  project_id: string
+  client_email: string
+  private_key: string
+}
+
+interface Admin {
+  db: Firestore
+  fs: FirestoreModule
+  verifyIdToken(token: string): Promise<{ uid: string; email?: string }>
+  createCustomToken(uid: string): Promise<string>
+}
+
+const GOOGLE_JWKS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'),
+)
+const CUSTOM_TOKEN_AUDIENCE = 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit'
+
+let admin: Promise<Admin | null> | null = null
 
 function loadAdmin() {
-  admin ??= (async () => {
+  admin ??= (async (): Promise<Admin | null> => {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT
     if (!raw) return null
+    const sa = JSON.parse(raw) as ServiceAccount
     const { cert, getApps, initializeApp } = await import('firebase-admin/app')
-    const app = getApps()[0] ?? initializeApp({ credential: cert(JSON.parse(raw)) })
-    const { getAuth } = await import('firebase-admin/auth')
+    const app = getApps()[0] ?? initializeApp({ credential: cert(sa as never) })
     const fs = await import('firebase-admin/firestore')
-    return { auth: getAuth(app), db: fs.getFirestore(app), fs }
+    const signingKey = await importPKCS8(sa.private_key, 'RS256')
+
+    return {
+      db: fs.getFirestore(app),
+      fs,
+      async verifyIdToken(token) {
+        const { payload } = await jwtVerify(token, GOOGLE_JWKS, {
+          issuer: `https://securetoken.google.com/${sa.project_id}`,
+          audience: sa.project_id,
+          algorithms: ['RS256'],
+        })
+        if (!payload.sub) throw new Error('Token without subject')
+        return { uid: payload.sub, email: typeof payload.email === 'string' ? payload.email : undefined }
+      },
+      async createCustomToken(uid) {
+        return new SignJWT({ uid })
+          .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+          .setIssuer(sa.client_email)
+          .setSubject(sa.client_email)
+          .setAudience(CUSTOM_TOKEN_AUDIENCE)
+          .setIssuedAt()
+          .setExpirationTime('1h')
+          .sign(signingKey)
+      },
+    }
   })().catch((err) => {
-    console.error('[passkey] admin init failed', err)
+    console.error('[passkey] admin init failed', err instanceof Error ? err.message : 'unknown error')
     admin = null
     return null
   })
@@ -97,7 +143,7 @@ async function requireUser(req: VercelRequest) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : ''
   if (!token) throw new HttpError(401, 'Inicia sesión primero.')
   try {
-    return await (await need()).auth.verifyIdToken(token)
+    return await (await need()).verifyIdToken(token)
   } catch {
     throw new HttpError(401, 'La sesión expiró. Vuelve a entrar.')
   }
@@ -227,7 +273,7 @@ async function loginVerify(req: VercelRequest) {
   const expectedChallenge = await takeChallenge(challengeId, 'login')
   if (!response?.id) throw new HttpError(400, 'Respuesta incompleta.')
 
-  const { db, fs, auth } = await need()
+  const { db, fs, createCustomToken } = await need()
   const ref = db.collection('passkeys').doc(response.id)
   const snap = await ref.get()
   if (!snap.exists) throw new HttpError(404, 'Este Face ID no está registrado. Entra con tu contraseña y actívalo de nuevo.')
@@ -251,7 +297,7 @@ async function loginVerify(req: VercelRequest) {
   if (!(await isMember(stored.uid))) throw new HttpError(403, 'Esta cuenta no está en la lista.')
 
   await ref.update({ counter: result.authenticationInfo.newCounter, lastUsedAt: fs.FieldValue.serverTimestamp() })
-  const token = await auth.createCustomToken(stored.uid)
+  const token = await createCustomToken(stored.uid)
   return { token }
 }
 
