@@ -1,4 +1,9 @@
-import { platformAuthenticatorIsAvailable, startAuthentication, startRegistration } from '@simplewebauthn/browser'
+import {
+  browserSupportsWebAuthn,
+  platformAuthenticatorIsAvailable,
+  startAuthentication,
+  startRegistration,
+} from '@simplewebauthn/browser'
 import { signInWithCustomToken } from 'firebase/auth'
 import { getFirebaseAuth } from './firebase'
 
@@ -24,22 +29,32 @@ async function call<T>(action: string, body: Record<string, unknown> = {}, idTok
   return data
 }
 
-let availability: Promise<boolean> | null = null
+export type PasskeySupport = 'ready' | 'no-browser' | 'no-device' | 'no-server'
+
+/** Whether Face ID sign-in can be used here, and if not, why. Never cached, so it recovers on its own. */
+export async function passkeySupport(): Promise<PasskeySupport> {
+  if (!browserSupportsWebAuthn()) return 'no-browser'
+  try {
+    if (!(await platformAuthenticatorIsAvailable())) return 'no-device'
+  } catch {
+    return 'no-device'
+  }
+  try {
+    const res = await fetch('/api/passkey', { method: 'GET', cache: 'no-store' })
+    if (!res.ok) return 'no-server'
+    return ((await res.json()) as { enabled?: boolean }).enabled ? 'ready' : 'no-server'
+  } catch {
+    return 'no-server'
+  }
+}
 
 /** true when this device has Face ID (or similar) and the server is configured. */
-export function passkeysAvailable(): Promise<boolean> {
-  availability ??= (async () => {
-    try {
-      if (!(await platformAuthenticatorIsAvailable())) return false
-      const res = await fetch('/api/passkey', { method: 'GET' })
-      if (!res.ok) return false
-      return Boolean(((await res.json()) as { enabled?: boolean }).enabled)
-    } catch {
-      return false
-    }
-  })()
-  return availability
+export async function passkeysAvailable(): Promise<boolean> {
+  return (await passkeySupport()) === 'ready'
 }
+
+/** Cheap, synchronous check: does this browser know about passkeys at all. */
+export const browserHasPasskeys = () => browserSupportsWebAuthn()
 
 /** Friendly message for the errors people actually hit. */
 function explain(err: unknown): Error {

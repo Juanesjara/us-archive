@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router'
-import { passkeysAvailable } from '../../lib/passkey'
+import { browserHasPasskeys } from '../../lib/passkey'
 import { useAuth } from '../../hooks/useAuth'
 import { Wordmark } from '../ui/Wordmark'
 
@@ -11,10 +10,8 @@ const nav = [
 
 export function AppShell() {
   const { isAdmin, signOut } = useAuth()
-  const [faceId, setFaceId] = useState(false)
-  useEffect(() => {
-    void passkeysAvailable().then(setFaceId)
-  }, [])
+  // Shown whenever the browser supports passkeys; the page explains anything else.
+  const faceId = browserHasPasskeys()
 
   return (
     <div className="flex min-h-dvh flex-col">

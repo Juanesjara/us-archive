@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from '../../components/ui/Button'
-import { enablePasskey, passkeyEnabledHere } from '../../lib/passkey'
+import { enablePasskey, passkeyEnabledHere, passkeySupport, type PasskeySupport } from '../../lib/passkey'
 
 /** /archive/face-id. Turns on Face ID sign-in for this phone. */
 export function FaceId() {
   const [enabled, setEnabled] = useState(passkeyEnabledHere)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [support, setSupport] = useState<PasskeySupport | null>(null)
+
+  useEffect(() => {
+    void passkeySupport().then(setSupport)
+  }, [])
 
   const activate = async () => {
     setBusy(true)
@@ -33,6 +38,19 @@ export function FaceId() {
             La próxima vez, en la pantalla de entrada, toca "Entrar con Face ID" y listo.
           </p>
         </>
+      ) : support === 'no-browser' || support === 'no-device' ? (
+        <>
+          <p className="serif mt-6 text-prose text-body">Este navegador no puede usar Face ID.</p>
+          <p className="mt-3 text-ui text-muted">
+            Si abriste el enlace desde WhatsApp o Instagram, ábrelo en Safari. Revisa también que Face ID esté
+            configurado en el celular.
+          </p>
+        </>
+      ) : support === 'no-server' ? (
+        <>
+          <p className="serif mt-6 text-prose text-body">Face ID no está disponible en este momento.</p>
+          <p className="mt-3 text-ui text-muted">Vuelve a intentarlo en un rato.</p>
+        </>
       ) : (
         <>
           <p className="serif mt-6 text-prose text-body">Entra sin escribir tu contraseña.</p>
@@ -40,7 +58,7 @@ export function FaceId() {
             Actívalo una vez en este celular. Después, en la pantalla de entrada, toca "Entrar con Face ID".
           </p>
           <div className="mt-10">
-            <Button onClick={() => void activate()} disabled={busy}>
+            <Button onClick={() => void activate()} disabled={busy || support !== 'ready'}>
               {busy ? 'Activando' : 'Activar Face ID'}
             </Button>
           </div>
