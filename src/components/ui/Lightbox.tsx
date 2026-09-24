@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Photo } from '../../types'
 import { formatFull, formatTime } from '../../lib/format'
-import { useAuth } from '../../hooks/useAuth'
 import { setPhotoCaption } from '../../services/archive'
 import { loadImage, useImage } from './ArchiveImage'
 
@@ -64,7 +63,6 @@ function CaptionEditor({ photo, onDone }: { photo: Photo; onDone: () => void }) 
 }
 
 export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
-  const { isAdmin } = useAuth()
   const [editingId, setEditingId] = useState<string | null>(null)
   const photo = photos[index]
   const hasPrev = index > 0
@@ -138,15 +136,13 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
               {photo.caption ? <p className="serif text-prose text-ink">{photo.caption}</p> : null}
               <p className="text-meta text-muted">{when}</p>
               {photo.location ? <p className="text-meta text-muted">{photo.location}</p> : null}
-              {isAdmin ? (
-                <button
-                  type="button"
-                  onClick={() => setEditingId(photo.id)}
-                  className="mt-2 text-meta text-ink hover:text-muted"
-                >
-                  {photo.caption ? 'Editar descripción' : 'Añadir descripción'}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => setEditingId(photo.id)}
+                className="mt-2 text-meta text-ink hover:text-muted"
+              >
+                {photo.caption ? 'Editar descripción' : 'Añadir descripción'}
+              </button>
             </>
           )}
         </div>
