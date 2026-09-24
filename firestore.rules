@@ -4,7 +4,8 @@ rules_version = '2';
 // - members/{uid}: one document per person allowed into the archive.
 //   Created by hand in the Firebase console. role is "admin" or "member".
 // - Everything else is readable by members and writable only by admins,
-//   except that any member can add new photos (images + photos create).
+//   except that any member can add new photos (images + photos create)
+//   and change a photo's caption.
 // - images/{id} holds each photo as a compressed JPEG data URL, so the
 //   archive runs on the free Spark plan without Cloud Storage.
 // - Nothing is public. There is a final deny-all for anything not listed.
@@ -64,8 +65,12 @@ service cloud.firestore {
     match /photos/{id} {
       allow read: if isMember();
       allow create: if isMember() && validPhoto();
-      allow update: if isAdmin() && validPhoto();
+      allow update: if validPhoto() && (isAdmin() || (isMember() && onlyCaptionChanged()));
       allow delete: if isAdmin();
+    }
+
+    function onlyCaptionChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption']);
     }
 
     function validPhoto() {
