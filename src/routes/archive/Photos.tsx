@@ -6,6 +6,7 @@ import { Lightbox } from '../../components/ui/Lightbox'
 import { ArchiveImage } from '../../components/ui/ArchiveImage'
 import { formatFull } from '../../lib/format'
 import { groupIntoAlbums } from '../../lib/albums'
+import { PhotoUploader } from '../../components/PhotoUploader'
 
 export function Photos() {
   const { items, loading, error } = useCollection<Photo>('photos')
@@ -19,6 +20,9 @@ export function Photos() {
   return (
     <div className="enter">
       <h1 className="serif text-title text-ink">Fotos</h1>
+      <div className="mt-6">
+        <PhotoUploader />
+      </div>
 
       {loading ? (
         <Loading />

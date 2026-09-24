@@ -2,7 +2,7 @@
 
 A private archive for two people: photos, grouped into albums and places. React, Vite, TypeScript, Tailwind and Firebase, deployed on Vercel.
 
-Everything private lives behind Firebase Authentication plus Firestore security rules. It runs on the free **Spark** plan: photos are compressed in the browser and stored inside Firestore, so Cloud Storage and a billing account are not needed. Only accounts listed in the `members` collection can read the archive, and only accounts with the `admin` role can write to it.
+Everything private lives behind Firebase Authentication plus Firestore security rules. It runs on the free **Spark** plan: photos are compressed in the browser and stored inside Firestore, so Cloud Storage and a billing account are not needed. Only accounts listed in the `members` collection can read the archive, any member can add photos, and only accounts with the `admin` role can edit or delete them or change anything else.
 
 ## Contents
 
@@ -93,7 +93,7 @@ Cloud Storage needs the paid Blaze plan on new projects, so photos live in Fires
 - Each image is its own document in `images/{id}`. Photos and the official state only store the id, so lists and counts never download image data. Images load one by one as they are shown and are cached for the session.
 - Images are immutable. Replacing a photo stores a new image and deletes the old one. Deleting an entry deletes its image.
 - Images are protected by the same rules as everything else. There are no public URLs.
-- Uploading is a single step: pick one or many photos in `/admin/photos` and they upload right away. Before compressing, the app reads each file's metadata with `exifr`: the time it was taken and its GPS position. Coordinates are turned into a short place name ("El Poblado, Medellín") through OpenStreetMap's public Nominatim service, one request per second, cached. Photos without metadata get today's date and no place.
+- Uploading is a single step: pick one or many photos at the top of Fotos (any member) or in `/admin/photos`, and they upload right away. Before compressing, the app reads each file's metadata with `exifr`: the time it was taken and its GPS position. Coordinates are turned into a short place name ("El Poblado, Medellín") through OpenStreetMap's public Nominatim service, one request per second, cached. Photos without metadata get today's date and no place.
 - The gallery groups photos into albums by local day and city automatically. There is nothing to name or manage.
 - Lugares is derived from the same data: one entry per city or town with photos, and inside it the photos grouped by neighbourhood. Photos without a location only appear in Fotos.
 - A description is optional and added afterwards, either from the photo viewer ("Añadir descripción") or from the admin list ("Editar"). Admins only.
@@ -121,7 +121,7 @@ What they enforce:
 - Nothing is readable or writable without signing in.
 - Signed-in accounts without a `members/{uid}` document get nothing. They see an "This account isn't on the list" screen in the app.
 - Members can read every archive collection, including `images`.
-- Only `role == "admin"` can create, update or delete.
+- Any member can add photos (create in `photos` and `images`). Only `role == "admin"` can update or delete, or change `settings/official`.
 - Writes are shape-checked: required fields, string length limits, timestamps where dates are expected, and images must be JPEG data URLs under 1 MB. Images cannot be edited, only created and deleted.
 - `members` cannot be written from the client at all.
 - A final catch-all denies anything not listed.
