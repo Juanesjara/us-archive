@@ -56,3 +56,7 @@ GH_TOKEN="$(gh auth token --user Juanesjara)" gh pr merge ...
 La identidad de git ya está en la config local del repo (`Juan Esteban Jaramillo <68408427+Juanesjara@users.noreply.github.com>`); si falta: `git config user.name "Juan Esteban Jaramillo" && git config user.email "68408427+Juanesjara@users.noreply.github.com"`.
 
 Para que el Git Credential Manager no pregunte qué cuenta usar en `push`/`fetch`, el repo tiene en su config local `credential.https://github.com.username = Juanesjara`. Si reaparece la ventana de escoger cuenta: `git config credential.https://github.com.username Juanesjara`.
+
+## Firebase CLI
+
+El CLI tiene varias cuentas de Google; este proyecto (`us-archive-jj`) usa **juanesteban0607bmx@gmail.com**, fijada para esta carpeta con `firebase login:use juanesteban0607bmx@gmail.com`. Si un deploy da 403, revisa `firebase login:list` y vuelve a fijarla. Despliega las reglas **antes** de mergear código que dependa de ellas: `firebase deploy --only firestore:rules`.
