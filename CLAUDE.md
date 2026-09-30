@@ -42,3 +42,14 @@ Sin Cloud Storage. Cada foto se comprime en el navegador (`compress.ts`, ≤900k
 - Overlays fijos se renderizan con `createPortal` a `body` (ver `Lightbox.tsx`) — un `transform` en un ancestro los descoloca.
 - Reusar `useAction`, `errorMessage`, `Row`, `FormFooter` de `src/routes/admin/shared.tsx` y `Button`/`LinkButton`/`Arrow` de `components/ui/Button.tsx`.
 - Commits: frase imperativa en inglés, sin prefijo (`Let every member upload photos`). Trabajo vía PR a `main`.
+
+## GitHub
+
+Este repo (`Juanesjara/us-archive`) siempre se opera con la cuenta **Juanesjara**. `gh` tiene dos cuentas logueadas y la activa global es otra (`juanesjarar`); no la cambies con `gh auth switch`, pasa el token por comando:
+
+```bash
+GH_TOKEN="$(gh auth token --user Juanesjara)" gh pr create ...
+GH_TOKEN="$(gh auth token --user Juanesjara)" gh pr merge ...
+```
+
+La identidad de git ya está en la config local del repo (`Juan Esteban Jaramillo <68408427+Juanesjara@users.noreply.github.com>`); si falta: `git config user.name "Juan Esteban Jaramillo" && git config user.email "68408427+Juanesjara@users.noreply.github.com"`.
