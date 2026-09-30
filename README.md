@@ -49,8 +49,6 @@ Copy `.env.example` to `.env` and fill in the values from the Firebase web app c
 | `VITE_FIREBASE_API_KEY`             | `apiKey`                                |
 | `VITE_FIREBASE_AUTH_DOMAIN`         | `authDomain`                            |
 | `VITE_FIREBASE_PROJECT_ID`          | `projectId`                             |
-| `VITE_FIREBASE_STORAGE_BUCKET`      | `storageBucket` (optional, unused)      |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` (optional)          |
 | `VITE_FIREBASE_APP_ID`              | `appId`                                 |
 
 These values ship to the browser by design. They identify the project; they do not grant access. Access is enforced by the Firestore security rules below. `.env` is git-ignored. Never commit it.
