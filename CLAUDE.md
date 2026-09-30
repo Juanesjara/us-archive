@@ -1,0 +1,55 @@
+# CLAUDE.md
+
+"us." — archivo privado de fotos para dos personas. React 19 + Vite 8 + TypeScript + Tailwind 4 + Firebase (Auth + Firestore, plan Spark gratis), desplegado en Vercel. El README tiene el setup completo de Firebase/Vercel; aquí solo va lo que importa para cambiar código.
+
+## Comandos
+
+```bash
+npm run dev          # http://localhost:5173 (necesita .env con VITE_FIREBASE_*)
+npm run build        # tsc -b && vite build — es la verificación principal
+npm run lint         # oxlint
+npx tsc -p api       # type-check de la función serverless; `npm run build` NO la cubre
+```
+
+No hay tests. Verificar = `build` + `lint` (+ `tsc -p api` si tocas `api/`). Node 24 (`engines`).
+
+## Arquitectura
+
+- `src/services/archive.ts` — **todas** las escrituras a Firestore pasan por aquí. `clean()` quita `undefined` (Firestore los rechaza); `withImage()` borra la imagen si la escritura que la referencia falla.
+- `src/hooks/useCollection.ts` — lecturas en vivo (`useCollection`, `useDocument`), siempre ordenadas por un solo campo; por eso no hay índices.
+- `src/hooks/useAuth.tsx` — usuario + doc `members/{uid}` + `isAdmin`.
+- `src/routes/guards.tsx` — `RequireConfig`, `RequireAuth`, `RequireAdmin`, `RequireIntro`. Rutas en `src/App.tsx`.
+- `src/lib/` — lógica pura: `albums.ts` (agrupa por día local + ciudad), `places.ts` (ciudad → barrios), `photoMeta.ts` (EXIF con `exifr` + geocoding inverso con Nominatim, cola de 1 req/s con caché), `compress.ts`, `format.ts`, `username.ts`, `passkey.ts`.
+- `api/passkey.ts` — única función de Vercel: Face ID vía WebAuthn → Firebase custom token.
+
+### Imágenes
+Sin Cloud Storage. Cada foto se comprime en el navegador (`compress.ts`, ≤900k chars de data URL) y va como JPEG base64 a `images/{id}`. `photos` solo guarda `imageId`. Las imágenes son **inmutables** (las reglas prohíben `update`); reemplazar = crear nueva + borrar vieja. `ArchiveImage.tsx` las cachea a nivel de módulo; si borras una, llama `forgetImage` (ya lo hace `deleteImage`). EXIF se lee del archivo **original antes** de comprimir (el canvas lo borra).
+
+## Reglas que hay que respetar
+
+- **Cambiar un campo de Firestore = tocar 3 sitios:** `src/types.ts`, `src/services/archive.ts` y `firestore.rules` (`validPhoto()` etc.). Las reglas validan forma y longitudes; si no coinciden, la escritura falla en producción sin error de compilación. Las reglas se despliegan aparte: `firebase deploy --only firestore:rules` (proyecto `us-archive-jj`).
+- Permisos: miembros leen todo, crean fotos y solo cambian `caption`; admin edita/borra y cambia `settings/official`. `members`, `passkeys` y `passkeyChallenges` son inaccesibles desde el cliente. Hay un deny-all final.
+- Fechas: días sin hora se guardan a mediodía local (`fromInputDate`) para que el día no cambie por zona horaria. Usa los helpers de `format.ts`, no `new Date(string)`.
+- Login por nombre: `nombre` → `nombre@members.us-archive.app` (`username.ts`). La contraseña se manda `trim().toLowerCase()`.
+- `api/passkey.ts`: **no importar `firebase-admin/auth`** — rompe el loader de Vercel (jwks-rsa + jose ESM). Tokens se verifican/firman con `jose`. Sin `FIREBASE_SERVICE_ACCOUNT` la función responde `{enabled:false}` y la UI oculta Face ID. El rpID del dominio propio es `alejayjuanesgallery.site`.
+- `vercel.json` reescribe todo excepto `/api/` a `index.html`.
+
+## Convenciones
+
+- Código y comentarios en inglés; **todo texto visible al usuario en español** (es-CO), incluidos mensajes de error lanzados desde `services`/`api` (se muestran tal cual vía `errorMessage`).
+- Estilo: sin punto y coma, comillas simples, 2 espacios, componentes con `export function` nombrado. Sin librerías de UI ni de estado.
+- Diseño: tokens en `src/index.css` (`paper`, `ink`, `body`, `muted`, `faint`, `rule`, `well`, `accent`, `danger`; tamaños `text-display/title/lead/prose/ui/meta`). Serif (`.serif`) para lo que se lee como escritura, sans para UI. Animación de entrada solo con `.enter*`; nada más se mueve.
+- Overlays fijos se renderizan con `createPortal` a `body` (ver `Lightbox.tsx`) — un `transform` en un ancestro los descoloca.
+- Reusar `useAction`, `errorMessage`, `Row`, `FormFooter` de `src/routes/admin/shared.tsx` y `Button`/`LinkButton`/`Arrow` de `components/ui/Button.tsx`.
+- Commits: frase imperativa en inglés, sin prefijo (`Let every member upload photos`). Trabajo vía PR a `main`.
+
+## GitHub
+
+Este repo (`Juanesjara/us-archive`) siempre se opera con la cuenta **Juanesjara**. `gh` tiene dos cuentas logueadas y la activa global es otra (`juanesjarar`); no la cambies con `gh auth switch`, pasa el token por comando:
+
+```bash
+GH_TOKEN="$(gh auth token --user Juanesjara)" gh pr create ...
+GH_TOKEN="$(gh auth token --user Juanesjara)" gh pr merge ...
+```
+
+La identidad de git ya está en la config local del repo (`Juan Esteban Jaramillo <68408427+Juanesjara@users.noreply.github.com>`); si falta: `git config user.name "Juan Esteban Jaramillo" && git config user.email "68408427+Juanesjara@users.noreply.github.com"`.

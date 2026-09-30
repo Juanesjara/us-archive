@@ -8,10 +8,9 @@ interface ImagePickerProps {
   /** Existing images/{id} to show when no new file is chosen. */
   currentId?: string | null
   onRemoveCurrent?: () => void
-  required?: boolean
 }
 
-export function ImagePicker({ label, file, onChange, currentId, onRemoveCurrent, required }: ImagePickerProps) {
+export function ImagePicker({ label, file, onChange, currentId, onRemoveCurrent }: ImagePickerProps) {
   const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
@@ -35,7 +34,6 @@ export function ImagePicker({ label, file, onChange, currentId, onRemoveCurrent,
         type="file"
         accept="image/*"
         className="sr-only"
-        required={required && !currentId}
         onChange={(e) => onChange(e.target.files?.[0] ?? null)}
       />
       {shown ? (

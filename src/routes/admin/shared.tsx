@@ -64,28 +64,6 @@ export function FormFooter({ busy, error, submitLabel, onCancel }: FormFooterPro
   )
 }
 
-/** A collapsed "Add" affordance that opens into a form. */
-export function Disclosure({
-  label,
-  open,
-  onOpen,
-  children,
-}: {
-  label: string
-  open: boolean
-  onOpen: () => void
-  children: ReactNode
-}) {
-  if (!open) {
-    return (
-      <Button variant="quiet" onClick={onOpen}>
-        + {label}
-      </Button>
-    )
-  }
-  return <div className="rounded-sm bg-well p-5 sm:p-6">{children}</div>
-}
-
 interface RowProps {
   children: ReactNode
   onEdit?: () => void
