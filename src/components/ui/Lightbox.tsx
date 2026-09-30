@@ -87,7 +87,7 @@ function Comments({ photoId }: { photoId: string }) {
   return (
     <div className="mt-4 max-w-md">
       {items.length > 0 ? (
-        <ul className="mb-3 max-h-32 space-y-2 overflow-y-auto">
+        <ul className="mb-3 max-h-32 space-y-2 overflow-y-auto overscroll-contain">
           {items.map((c) => (
             <li key={c.id} className="text-ui">
               <span className="font-medium text-ink">{c.name}</span> <span className="text-body">{c.text}</span>
@@ -107,7 +107,7 @@ function Comments({ photoId }: { photoId: string }) {
         </label>
         <input
           id="comment"
-          className="field text-ui"
+          className="field text-prose"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Escribe un comentario"
@@ -145,11 +145,16 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
       if (e.key === 'ArrowRight' && hasNext) onIndex(index + 1)
     }
     window.addEventListener('keydown', onKey)
+    // Lock both: the page scrolls on <html>, and iOS ignores a lock on <body> alone.
+    const root = document.documentElement
     const prevOverflow = document.body.style.overflow
+    const prevRootOverflow = root.style.overflow
     document.body.style.overflow = 'hidden'
+    root.style.overflow = 'hidden'
     return () => {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prevOverflow
+      root.style.overflow = prevRootOverflow
     }
   }, [index, hasPrev, hasNext, onClose, onIndex])
 
@@ -172,7 +177,7 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
       role="dialog"
       aria-modal="true"
       aria-label={photo.caption || 'Foto'}
-      className="fixed inset-0 z-50 grid h-dvh grid-rows-[auto_minmax(0,1fr)_auto] bg-paper"
+      className="fixed inset-0 z-50 grid h-dvh grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden overscroll-none bg-paper"
       onClick={onClose}
     >
       <div className="flex items-center justify-between px-6 pb-3 pt-5 sm:px-10">
