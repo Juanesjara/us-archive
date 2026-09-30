@@ -21,6 +21,7 @@ No hay tests. Verificar = `build` + `lint` (+ `tsc -p api` si tocas `api/`). Nod
 - `src/routes/guards.tsx` — `RequireConfig`, `RequireAuth`, `RequireAdmin`, `RequireIntro`. Rutas en `src/App.tsx`.
 - `src/lib/` — lógica pura: `albums.ts` (agrupa por día local + ciudad), `places.ts` (ciudad → barrios), `photoMeta.ts` (EXIF con `exifr` + geocoding inverso con Nominatim, cola de 1 req/s con caché), `compress.ts`, `format.ts`, `username.ts`, `passkey.ts`.
 - `api/passkey.ts` — única función de Vercel: Face ID vía WebAuthn → Firebase custom token.
+- Comentarios: `photos/{id}/comments`, se muestran y escriben en `Lightbox.tsx` (`Comments`). El nombre se copia al escribir (`member.name` o el nombre de login). Borrar una foto borra antes sus comentarios (Firestore no borra subcolecciones solo).
 
 ### Imágenes
 Sin Cloud Storage. Cada foto se comprime en el navegador (`compress.ts`, ≤900k chars de data URL) y va como JPEG base64 a `images/{id}`. `photos` solo guarda `imageId`. Las imágenes son **inmutables** (las reglas prohíben `update`); reemplazar = crear nueva + borrar vieja. `ArchiveImage.tsx` las cachea a nivel de módulo; si borras una, llama `forgetImage` (ya lo hace `deleteImage`). EXIF se lee del archivo **original antes** de comprimir (el canvas lo borra).
@@ -53,3 +54,5 @@ GH_TOKEN="$(gh auth token --user Juanesjara)" gh pr merge ...
 ```
 
 La identidad de git ya está en la config local del repo (`Juan Esteban Jaramillo <68408427+Juanesjara@users.noreply.github.com>`); si falta: `git config user.name "Juan Esteban Jaramillo" && git config user.email "68408427+Juanesjara@users.noreply.github.com"`.
+
+Para que el Git Credential Manager no pregunte qué cuenta usar en `push`/`fetch`, el repo tiene en su config local `credential.https://github.com.username = Juanesjara`. Si reaparece la ventana de escoger cuenta: `git config credential.https://github.com.username Juanesjara`.

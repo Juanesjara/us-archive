@@ -1,8 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import type { Photo } from '../../types'
-import { formatFull, formatTime } from '../../lib/format'
-import { setPhotoCaption } from '../../services/archive'
+import type { Comment, Photo } from '../../types'
+import { formatFull, formatShort, formatTime } from '../../lib/format'
+import { emailToName } from '../../lib/username'
+import { addComment, deleteComment, setPhotoCaption } from '../../services/archive'
+import { useAuth } from '../../hooks/useAuth'
+import { useCollection } from '../../hooks/useCollection'
+import { confirmDelete, useAction } from '../../routes/admin/shared'
 import { loadImage, useImage } from './ArchiveImage'
 
 interface LightboxProps {
@@ -59,6 +63,66 @@ function CaptionEditor({ photo, onDone }: { photo: Photo; onDone: () => void }) 
         </button>
       </div>
     </form>
+  )
+}
+
+/** Comments under a photo, oldest first, each with the name of who wrote it. */
+function Comments({ photoId }: { photoId: string }) {
+  const { user, member, isAdmin } = useAuth()
+  const { items } = useCollection<Comment>(`photos/${photoId}/comments`, 'createdAt', 'asc')
+  const [text, setText] = useState('')
+  const { busy, error, run } = useAction()
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!user || !text.trim()) return
+    const name = member?.name?.trim() || emailToName(user.email) || 'Alguien'
+    void run(() => addComment(photoId, { uid: user.uid, name }, text), () => setText(''))
+  }
+
+  const remove = (id: string) => {
+    if (confirmDelete('este comentario')) void run(() => deleteComment(photoId, id))
+  }
+
+  return (
+    <div className="mt-4 max-w-md">
+      {items.length > 0 ? (
+        <ul className="mb-3 max-h-32 space-y-2 overflow-y-auto">
+          {items.map((c) => (
+            <li key={c.id} className="text-ui">
+              <span className="font-medium text-ink">{c.name}</span> <span className="text-body">{c.text}</span>
+              <span className="ml-2 text-meta text-faint">{formatShort(c.createdAt)}</span>
+              {isAdmin || c.uid === user?.uid ? (
+                <button type="button" onClick={() => remove(c.id)} className="ml-2 text-meta text-faint hover:text-danger">
+                  Borrar
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <form onSubmit={submit} className="flex items-baseline gap-4">
+        <label className="sr-only" htmlFor="comment">
+          Comentario
+        </label>
+        <input
+          id="comment"
+          className="field text-ui"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Escribe un comentario"
+          maxLength={500}
+        />
+        <button type="submit" disabled={busy || !text.trim()} className="shrink-0 text-meta text-ink hover:text-muted disabled:opacity-40">
+          Enviar
+        </button>
+      </form>
+      {error ? (
+        <p className="mt-2 text-meta text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -143,6 +207,7 @@ export function Lightbox({ photos, index, onClose, onIndex }: LightboxProps) {
               >
                 {photo.caption ? 'Editar descripción' : 'Añadir descripción'}
               </button>
+              <Comments key={photo.id} photoId={photo.id} />
             </>
           )}
         </div>

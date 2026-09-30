@@ -32,6 +32,16 @@ export interface Photo {
   createdAt?: Timestamp
 }
 
+/** photos/{photoId}/comments/{id}. name is copied at write time so reading needs no lookup. */
+export interface Comment {
+  id: string
+  uid: string
+  name: string
+  text: string
+  /** null in the local snapshot until the server confirms the write. */
+  createdAt: Timestamp | null
+}
+
 /** settings/official: the state switched on after the question is asked in person. */
 export interface OfficialState {
   active: boolean

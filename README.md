@@ -79,6 +79,7 @@ The remaining collections are created automatically the first time you add somet
 | ------------------- | ------------------------------------------------------------------ |
 | `images`            | One compressed JPEG per document, as a data URL. `data`, `width`, `height` |
 | `photos`            | Gallery. `imageId`, `date`, `caption?`, `location?`                 |
+| `photos/{id}/comments` | Comments on a photo. `uid`, `name`, `text`, `createdAt`         |
 | `settings/official` | On/off switch and photo for the "Nuevo recuerdo agregado." block on the home page |
 
 No indexes are needed: every query orders by a single field.
@@ -120,6 +121,7 @@ What they enforce:
 - Signed-in accounts without a `members/{uid}` document get nothing. They see an "This account isn't on the list" screen in the app.
 - Members can read every archive collection, including `images`.
 - Any member can add photos (create in `photos` and `images`) and change a photo's `caption`. Only `role == "admin"` can change other fields, delete, or change `settings/official`.
+- Any member can comment on a photo as themselves (`uid` must match, text up to 500 characters). Comments cannot be edited; the author or an admin can delete them. Deleting a photo deletes its comments first.
 - Writes are shape-checked: required fields, string length limits, timestamps where dates are expected, and images must be JPEG data URLs under 1 MB. Images cannot be edited, only created and deleted.
 - `members` cannot be written from the client at all.
 - A final catch-all denies anything not listed.
