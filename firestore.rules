@@ -6,6 +6,8 @@ rules_version = '2';
 // - Everything else is readable by members and writable only by admins,
 //   except that any member can add new photos (images + photos create)
 //   and change a photo's caption.
+// - photos/{id}/comments/{id}: any member comments as themselves; the author
+//   or an admin can delete a comment, nobody can edit one.
 // - images/{id} holds each photo as a compressed JPEG data URL, so the
 //   archive runs on the free Spark plan without Cloud Storage.
 // - Nothing is public. There is a final deny-all for anything not listed.
@@ -67,6 +69,19 @@ service cloud.firestore {
       allow create: if isMember() && validPhoto();
       allow update: if validPhoto() && (isAdmin() || (isMember() && onlyCaptionChanged()));
       allow delete: if isAdmin();
+
+      // Any member comments as themselves; authors and admins delete, nobody edits.
+      match /comments/{commentId} {
+        allow read: if isMember();
+        allow create: if isMember()
+          && data().keys().hasOnly(['uid', 'name', 'text', 'createdAt'])
+          && data().uid == request.auth.uid
+          && data().name is string && data().name.size() > 0 && data().name.size() <= 60
+          && data().text is string && data().text.size() > 0 && data().text.size() <= 500
+          && data().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isAdmin() || (isMember() && resource.data.uid == request.auth.uid);
+      }
     }
 
     function onlyCaptionChanged() {

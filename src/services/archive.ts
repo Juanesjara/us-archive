@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -113,9 +114,29 @@ export async function updatePhotoDetails(id: string, input: { caption: string; d
   })
 }
 
+/** Firestore keeps subcollections when a document is deleted, so comments go first. */
 export async function deletePhoto(id: string, imageId: string) {
+  const comments = await getDocs(collection(getDb(), 'photos', id, 'comments'))
+  await Promise.all(comments.docs.map((c) => deleteDoc(c.ref)))
   await deleteDoc(doc(getDb(), 'photos', id))
   await deleteImage(imageId)
+}
+
+/* ------------------------------------------------------------------------ */
+/* Comments                                                                 */
+/* ------------------------------------------------------------------------ */
+
+export async function addComment(photoId: string, author: { uid: string; name: string }, text: string) {
+  await addDoc(collection(getDb(), 'photos', photoId, 'comments'), {
+    uid: author.uid,
+    name: author.name,
+    text: text.trim(),
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function deleteComment(photoId: string, id: string) {
+  await deleteDoc(doc(getDb(), 'photos', photoId, 'comments', id))
 }
 
 /* ------------------------------------------------------------------------ */
