@@ -31,6 +31,8 @@ En Cloud Storage (bucket `us-archive-jj.firebasestorage.app`, us-central1): `ima
 - Fechas: días sin hora se guardan a mediodía local (`fromInputDate`) para que el día no cambie por zona horaria. Usa los helpers de `format.ts`, no `new Date(string)`.
 - Login por nombre: `nombre` → `nombre@members.us-archive.app` (`username.ts`). La contraseña se manda `trim().toLowerCase()`.
 - `vercel.json` reescribe todo a `index.html` (no hay funciones serverless).
+- `vercel.json` manda una **CSP** estricta: cualquier dominio externo nuevo (API, fuentes, mapas) hay que agregarlo a `connect-src`/`img-src`/etc. o el navegador lo bloquea solo en producción (`npm run dev` no aplica esos headers).
+- Las reglas usan `hasOnly` en `photos` y `settings/official`: un campo nuevo que no esté en la lista se rechaza. Un comentario solo se acepta si `name` es exactamente `members/{uid}.name`.
 
 ## Convenciones
 

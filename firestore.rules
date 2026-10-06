@@ -50,23 +50,18 @@ service cloud.firestore {
 
     match /images/{id} {
       allow read: if isMember();
-      allow create: if isMember()
-        && data().data is string
-        && data().data.size() < 1000000
-        && data().data.matches('^data:image/jpeg;base64,.*')
-        && data().width is int
-        && data().height is int;
-      allow update: if false; // images are immutable; replacing one creates a new id
+      allow create, update: if false; // photos are uploaded to Cloud Storage now
       allow delete: if isAdmin();
     }
 
-    function optionalNumber(field) {
-      return !(field in data()) || data()[field] == null || data()[field] is number;
+    function optionalRange(field, max) {
+      return !(field in data()) || data()[field] == null
+        || (data()[field] is number && data()[field] >= -max && data()[field] <= max);
     }
 
     match /photos/{id} {
       allow read: if isMember();
-      allow create: if isMember() && validPhoto();
+      allow create: if isMember() && validPhoto() && data().createdAt == request.time;
       allow update: if validPhoto() && (isAdmin() || (isMember() && onlyCaptionChanged()));
       allow delete: if isAdmin();
 
@@ -76,7 +71,7 @@ service cloud.firestore {
         allow create: if isMember()
           && data().keys().hasOnly(['uid', 'name', 'text', 'createdAt'])
           && data().uid == request.auth.uid
-          && data().name is string && data().name.size() > 0 && data().name.size() <= 60
+          && data().name == get(memberPath()).data.name
           && data().text is string && data().text.size() > 0 && data().text.size() <= 500
           && data().createdAt == request.time;
         allow update: if false;
@@ -94,21 +89,25 @@ service cloud.firestore {
     }
 
     function validPhoto() {
-      return data().imageId is string
+      return data().keys().hasOnly(['imageId', 'date', 'hasTime', 'caption', 'location', 'city', 'lat', 'lng', 'createdAt'])
+        && data().imageId is string && data().imageId.size() > 0 && data().imageId.size() <= 40
         && data().date is timestamp
         && (!('hasTime' in data()) || data().hasTime is bool)
         && optionalString('caption', 200)
         && optionalString('location', 160)
         && optionalString('city', 120)
-        && optionalNumber('lat')
-        && optionalNumber('lng');
+        && optionalRange('lat', 90)
+        && optionalRange('lng', 180);
     }
 
     match /settings/official {
       allow read: if isMember();
       allow write: if isAdmin()
+        && data().keys().hasOnly(['active', 'date', 'photoId', 'caption'])
         && data().active is bool
-        && optionalId('photoId');
+        && (!('date' in data()) || data().date == null || data().date is timestamp)
+        && optionalId('photoId')
+        && optionalString('caption', 200);
     }
 
     match /{document=**} {
