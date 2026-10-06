@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useCollection } from '../../hooks/useCollection'
+import { useCollection, useCommentCounts } from '../../hooks/useCollection'
 import type { Photo } from '../../types'
 import { EmptyState, ErrorNote, Loading } from '../../components/ui/EmptyState'
 import { Lightbox } from '../../components/ui/Lightbox'
@@ -10,6 +10,7 @@ import { PhotoUploader } from '../../components/PhotoUploader'
 
 export function Photos() {
   const { items, loading, error } = useCollection<Photo>('photos')
+  const commentCounts = useCommentCounts()
   const [openId, setOpenId] = useState<string | null>(null)
 
   const albums = useMemo(() => groupIntoAlbums(items), [items])
@@ -44,25 +45,35 @@ export function Photos() {
                 </div>
               </header>
               <ul className="columns-2 gap-4 sm:gap-6 md:columns-3">
-                {album.photos.map((photo) => (
-                  <li key={photo.id} className="mb-4 break-inside-avoid sm:mb-6">
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(photo.id)}
-                      className="block w-full text-left"
-                      aria-label={photo.caption ? `Abrir foto: ${photo.caption}` : 'Abrir foto'}
-                    >
-                      <ArchiveImage
-                        id={photo.imageId}
-                        alt={photo.caption || ''}
-                        className="w-full rounded-sm transition-opacity duration-300 hover:opacity-90"
-                      />
-                      {photo.caption ? (
-                        <span className="serif mt-2 block truncate text-ui text-body">{photo.caption}</span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
+                {album.photos.map((photo) => {
+                  const comments = commentCounts.get(photo.id) ?? 0
+                  return (
+                    <li key={photo.id} className="mb-4 break-inside-avoid sm:mb-6">
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(photo.id)}
+                        className="block w-full text-left"
+                        aria-label={photo.caption ? `Abrir foto: ${photo.caption}` : 'Abrir foto'}
+                      >
+                        <ArchiveImage
+                          id={photo.imageId}
+                          alt={photo.caption || ''}
+                          className="w-full rounded-sm transition-opacity duration-300 hover:opacity-90"
+                        />
+                        {photo.caption || comments ? (
+                          <span className="mt-2 flex items-baseline justify-between gap-3">
+                            <span className="serif truncate text-ui text-body">{photo.caption || ''}</span>
+                            {comments ? (
+                              <span className="shrink-0 text-meta text-faint">
+                                {comments === 1 ? '1 comentario' : `${comments} comentarios`}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           ))}

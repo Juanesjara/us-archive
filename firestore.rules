@@ -84,6 +84,11 @@ service cloud.firestore {
       }
     }
 
+    // Lets the photo grid count comments with a single collection-group query.
+    match /{path=**}/comments/{commentId} {
+      allow read: if isMember();
+    }
+
     function onlyCaptionChanged() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption']);
     }
