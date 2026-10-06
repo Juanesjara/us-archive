@@ -69,6 +69,7 @@ export function Places() {
                 <Link to={`/archive/places/${place.slug}`} className="group block">
                   <ArchiveImage
                     id={place.photos[0].imageId}
+                    size="thumb"
                     ratio="4 / 5"
                     className="aspect-[4/5] w-full rounded-sm object-cover transition-opacity duration-300 group-hover:opacity-90"
                   />

@@ -118,6 +118,7 @@ export function AdminPhotos() {
                       <div className="flex gap-4">
                         <ArchiveImage
                           id={photo.imageId}
+                          size="thumb"
                           ratio="1 / 1"
                           className="h-16 w-16 shrink-0 rounded-sm object-cover"
                         />

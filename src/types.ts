@@ -2,13 +2,6 @@ import type { Timestamp } from 'firebase/firestore'
 
 export type Role = 'admin' | 'member'
 
-/** images/{id}. Kept apart from the metadata so lists and counts stay light. */
-export interface StoredImage {
-  data: string
-  width: number
-  height: number
-}
-
 export interface Member {
   role: Role
   name?: string
@@ -16,7 +9,7 @@ export interface Member {
 
 export interface Photo {
   id: string
-  /** images/{imageId}: the compressed JPEG, stored as a data URL. */
+  /** Cloud Storage images/{imageId}/full.jpg and thumb.jpg. */
   imageId: string
   /** When the photo was taken. Date-only photos are stored at local noon. */
   date: Timestamp

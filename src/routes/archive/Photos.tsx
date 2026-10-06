@@ -57,6 +57,7 @@ export function Photos() {
                       >
                         <ArchiveImage
                           id={photo.imageId}
+                          size="thumb"
                           alt={photo.caption || ''}
                           className="w-full rounded-sm transition-opacity duration-300 hover:opacity-90"
                         />

@@ -9,37 +9,56 @@ import {
   updateDoc,
   type Timestamp,
 } from 'firebase/firestore'
+import { deleteObject, uploadBytes } from 'firebase/storage'
 import { getDb } from '../lib/firebase'
-import { compressImage } from '../lib/compress'
-import { forgetImage } from '../components/ui/ArchiveImage'
+import { encodeImage } from '../lib/compress'
+import { forgetImage, imageRef } from '../components/ui/ArchiveImage'
 import type { OfficialState } from '../types'
 
 /* ------------------------------------------------------------------------ */
 /* Images                                                                   */
 /*                                                                          */
-/* Stored as compressed JPEG data URLs in images/{id}, one per document,    */
-/* so the whole archive runs on the free Spark plan without Cloud Storage.  */
+/* Stored in Cloud Storage as images/{id}/full.jpg and images/{id}/thumb.jpg */
+/* Ids come from Firestore's generator so they look like every other id.    */
 /* ------------------------------------------------------------------------ */
 
-/** Compresses and stores an image. Returns the new images/{id}. */
+// Images never change after upload, so browsers may keep them for a year.
+const IMAGE_METADATA = { contentType: 'image/jpeg', cacheControl: 'private, max-age=31536000, immutable' }
+
+/** Re-encodes and uploads an image. Returns its id. */
 export async function saveImage(file: File): Promise<string> {
   if (!file.type.startsWith('image/') && !/\.(heic|heif)$/i.test(file.name)) {
     throw new Error('Solo se pueden subir imágenes.')
   }
-  const image = await compressImage(file)
-  const ref = await addDoc(collection(getDb(), 'images'), {
-    data: image.dataUrl,
-    width: image.width,
-    height: image.height,
-    createdAt: serverTimestamp(),
-  })
-  return ref.id
+  const image = await encodeImage(file)
+  const id = doc(collection(getDb(), 'images')).id
+  try {
+    await Promise.all([
+      uploadBytes(imageRef(id, 'full'), image.full, IMAGE_METADATA),
+      uploadBytes(imageRef(id, 'thumb'), image.thumb, IMAGE_METADATA),
+    ])
+  } catch (err) {
+    await deleteImage(id).catch(() => undefined)
+    if ((err as { code?: string }).code === 'storage/retry-limit-exceeded') {
+      throw new Error('No se pudo subir la foto. Revisa la conexión e inténtalo otra vez.')
+    }
+    throw err
+  }
+  return id
 }
 
 export async function deleteImage(id: string | null | undefined) {
   if (!id) return
   forgetImage(id)
-  await deleteDoc(doc(getDb(), 'images', id))
+  await Promise.all([
+    ...(['full', 'thumb'] as const).map((size) =>
+      deleteObject(imageRef(id, size)).catch((err: { code?: string }) => {
+        if (err.code !== 'storage/object-not-found') throw err
+      }),
+    ),
+    // Photos from before the move to Storage also have a copy in Firestore.
+    deleteDoc(doc(getDb(), 'images', id)),
+  ])
 }
 
 /* ------------------------------------------------------------------------ */
