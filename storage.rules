@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// images/{id}/full.jpg and images/{id}/thumb.jpg: every photo in the archive.
+// Same access model as firestore.rules: members read and upload, only admins
+// delete, nothing is ever overwritten, nothing is public.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function memberPath() {
+      return /databases/(default)/documents/members/$(request.auth.uid);
+    }
+
+    function isMember() {
+      return request.auth != null && firestore.exists(memberPath());
+    }
+
+    function isAdmin() {
+      return isMember() && firestore.get(memberPath()).data.role == 'admin';
+    }
+
+    match /images/{id}/{file} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && file in ['full.jpg', 'thumb.jpg']
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size < 25 * 1024 * 1024;
+      allow update: if false; // images are immutable; replacing one creates a new id
+      allow delete: if isAdmin();
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

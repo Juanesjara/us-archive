@@ -8,8 +8,8 @@ rules_version = '2';
 //   and change a photo's caption.
 // - photos/{id}/comments/{id}: any member comments as themselves; the author
 //   or an admin can delete a comment, nobody can edit one.
-// - images/{id} holds each photo as a compressed JPEG data URL, so the
-//   archive runs on the free Spark plan without Cloud Storage.
+// - images/{id}: legacy copies of the photos as compressed JPEG data URLs,
+//   from before they moved to Cloud Storage (see storage.rules). No longer read.
 // - Nothing is public. There is a final deny-all for anything not listed.
 service cloud.firestore {
   match /databases/{database}/documents {

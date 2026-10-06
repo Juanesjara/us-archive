@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import Supercluster from 'supercluster'
 import type { Located } from '../../types'
 import { formatShort } from '../../lib/format'
-import { thumbnail } from '../../lib/thumbnail'
+import { loadImage } from './ArchiveImage'
 
 setWorkerUrl(workerUrl)
 
@@ -110,7 +110,7 @@ export function PhotoMap({ photos, onOpen }: PhotoMapProps) {
         e.stopPropagation()
         onClick()
       })
-      void thumbnail(imageId).then((url) => {
+      void loadImage(imageId, 'thumb').then((url) => {
         if (url) button.style.backgroundImage = `url(${url})`
       })
       return new Marker({ element: button, anchor: 'bottom' }).setLngLat(lngLat)

@@ -2,7 +2,7 @@
 
 A private archive for two people: photos, grouped into albums and places. React, Vite, TypeScript, Tailwind and Firebase, deployed on Vercel.
 
-Everything private lives behind Firebase Authentication plus Firestore security rules. It runs on the free **Spark** plan: photos are compressed in the browser and stored inside Firestore, so Cloud Storage and a billing account are not needed. Only accounts listed in the `members` collection can read the archive, any member can add photos, and only accounts with the `admin` role can edit or delete them or change anything else.
+Everything private lives behind Firebase Authentication plus Firestore and Cloud Storage security rules. It runs on the **Blaze** plan, inside its no-cost quota: photos are stored in Cloud Storage at close to full resolution, with a small preview for grids and the map. Only accounts listed in the `members` collection can read the archive, any member can add photos, and only accounts with the `admin` role can edit or delete them or change anything else.
 
 ## Contents
 
@@ -29,7 +29,7 @@ npm run dev
 
 ## Firebase setup
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project. The free Spark plan is enough.
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project and upgrade it to the Blaze plan (Cloud Storage needs it).
 2. Add a **Web app** to the project (Project settings, Your apps, `</>`). Do not enable Firebase Hosting. Copy the `firebaseConfig` values into `.env`.
 
 Or, with the Firebase CLI installed and signed in:
@@ -86,31 +86,32 @@ No indexes are needed: every query orders by a single field.
 
 ## How photos are stored
 
-Cloud Storage needs the paid Blaze plan on new projects, so photos live in Firestore instead:
+Photos live in Cloud Storage, in the default bucket `PROJECT_ID.firebasestorage.app` (created in `us-central1`, the region with a no-cost quota):
 
-- Before upload, the browser decodes the image, applies its EXIF rotation, resizes it to at most 1600 px on the long edge and re-encodes it as JPEG. If it is still too large it steps quality and size down until it fits one Firestore document (1 MiB). An iPhone photo of about 3 MB lands at roughly 250 to 450 KB. HEIC photos picked on an iPhone are converted along the way.
-- Each image is its own document in `images/{id}`. Photos and the official state only store the id, so lists and counts never download image data. Images load one by one as they are shown and are cached for the session.
+- Before upload, the browser decodes the image, applies its EXIF rotation and re-encodes it twice as JPEG: `images/{id}/full.jpg`, at most 4096 px on the long edge (iOS Safari's canvas limit), and `images/{id}/thumb.jpg`, at most 640 px. HEIC photos picked on an iPhone are converted along the way. Photos and the official state only store the id.
+- Grids, Lugares and the map show the thumbnail; the viewer and the home page show the full photo.
+- Images are downloaded with `getBlob`, which checks `storage.rules` on every request. `getDownloadURL` is not used: its URLs work for anyone who has the link. `getBlob` needs CORS on the bucket: `gcloud storage buckets update gs://PROJECT_ID.firebasestorage.app --cors-file=cors.json` with `[{"origin":["*"],"method":["GET"],"maxAgeSeconds":3600}]` (any origin is fine, the rules still require a member).
+- `storage.rules` reads `members/{uid}` from Firestore, which needs the role **Firebase Rules Firestore Service Agent** on the Storage service agent (`service-PROJECT_NUMBER@gcp-sa-firebasestorage.iam.gserviceaccount.com`). The console offers to grant it the first time; otherwise add it in IAM.
 - Images are immutable. Replacing a photo stores a new image and deletes the old one. Deleting an entry deletes its image.
-- Images are protected by the same rules as everything else. There are no public URLs.
 - Uploading is a single step: pick one or many photos at the top of Fotos (any member) or in `/admin/photos`, and they upload right away. Before compressing, the app reads each file's metadata with `exifr`: the time it was taken and its GPS position. Coordinates are turned into a short place name ("El Poblado, Medellín") through OpenStreetMap's public Nominatim service, one request per second, cached. Photos without metadata get today's date and no place.
 - The gallery groups photos into albums by local day and city automatically. There is nothing to name or manage.
 - Lugares is derived from the same data: one entry per city or town with photos, and inside it the photos grouped by neighbourhood. Photos without a location only appear in Fotos.
 - A description is optional and added afterwards, either from the photo viewer ("Añadir descripción") or from the admin list ("Editar"). Any member can add or change a description from the viewer; only admins can change the date and time.
 - On an iPhone, the photo picker may leave out the location. If photos arrive without a place, tap "Opciones" at the top of the picker and turn on location.
 
-Free Spark quota, for reference: 1 GiB stored and 50,000 document reads a day. At about 350 KB per photo that is roughly 3,000 photos, and each photo viewed costs one read.
+No-cost Cloud Storage quota on Blaze, for reference: 5 GB stored, 1 GB downloaded a day, 20,000 uploads and 50,000 downloads a day. A full photo is about 2 to 5 MB, so roughly 1,000 to 2,000 photos fit before storage costs a few cents a month. A budget alert on the billing account warns by email before anything adds up.
 
-If the project ever moves to Blaze, Cloud Storage would be the better home for large volumes. The change is contained in `src/services/archive.ts` and `src/components/ui/ArchiveImage.tsx`.
+Photos uploaded before the move were compressed into Firestore `images/{id}` documents (at most 1600 px). They were copied to Storage as they were; the Firestore copies are no longer read.
 
 ## Security rules
 
-The rules live in `firestore.rules` at the project root. Deploy them with the Firebase CLI:
+The rules live in `firestore.rules` and `storage.rules` at the project root. Deploy them with the Firebase CLI:
 
 ```bash
 npm install -g firebase-tools
 firebase login
 firebase use <your-project-id>
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules,storage
 ```
 
 Or paste the file into the **Rules** tab of Firestore in the console.

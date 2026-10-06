@@ -1,25 +1,19 @@
 /**
- * Resize and re-encode an image in the browser so it fits inside one
- * Firestore document (1 MiB hard limit, including field names).
+ * Re-encode an image in the browser as two JPEGs for Cloud Storage: the full
+ * photo, kept close to its original resolution, and a small preview for grids
+ * and the map.
  *
- * iPhone photos are ~3 MB and often HEIC. Drawing onto a canvas and exporting
- * JPEG fixes both size and format. EXIF orientation is applied when decoding.
- * If the first pass is still too large, quality and then dimensions step down
- * until the base64 data URL fits.
+ * iPhone photos are often HEIC, which most browsers can't show. Drawing onto a
+ * canvas and exporting JPEG fixes the format. EXIF orientation is applied when
+ * decoding; the rest of EXIF is lost, so it must be read from the file first.
  */
-const MAX_DATA_URL_CHARS = 900_000
-const STEPS: { edge: number; quality: number }[] = [
-  { edge: 1600, quality: 0.82 },
-  { edge: 1600, quality: 0.72 },
-  { edge: 1400, quality: 0.7 },
-  { edge: 1200, quality: 0.68 },
-  { edge: 1000, quality: 0.65 },
-]
+// iOS Safari refuses canvases above ~16.7 MP; 4096 on the long edge stays under it.
+const FULL = { edge: 4096, quality: 0.9 }
+const THUMB = { edge: 640, quality: 0.8 }
 
-export interface CompressedImage {
-  dataUrl: string
-  width: number
-  height: number
+export interface EncodedImage {
+  full: Blob
+  thumb: Blob
 }
 
 async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
@@ -42,7 +36,7 @@ async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
   }
 }
 
-export async function compressImage(file: File): Promise<CompressedImage> {
+export async function encodeImage(file: File): Promise<EncodedImage> {
   let source: ImageBitmap | HTMLImageElement
   try {
     source = await decode(file)
@@ -58,21 +52,24 @@ export async function compressImage(file: File): Promise<CompressedImage> {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('No se pudo procesar la imagen en este navegador.')
 
+  const draw = async ({ edge, quality }: { edge: number; quality: number }) => {
+    const scale = Math.min(1, edge / Math.max(srcW, srcH))
+    canvas.width = Math.round(srcW * scale)
+    canvas.height = Math.round(srcH * scale)
+    ctx.fillStyle = '#ffffff' // transparent PNGs would otherwise turn black
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (!blob) throw new Error('No se pudo procesar la imagen en este navegador.')
+    return blob
+  }
+
   try {
-    for (const step of STEPS) {
-      const scale = Math.min(1, step.edge / Math.max(srcW, srcH))
-      const w = Math.round(srcW * scale)
-      const h = Math.round(srcH * scale)
-      canvas.width = w
-      canvas.height = h
-      ctx.fillStyle = '#ffffff' // transparent PNGs would otherwise turn black
-      ctx.fillRect(0, 0, w, h)
-      ctx.drawImage(source, 0, 0, w, h)
-      const dataUrl = canvas.toDataURL('image/jpeg', step.quality)
-      if (dataUrl.length <= MAX_DATA_URL_CHARS) return { dataUrl, width: w, height: h }
-    }
+    const full = await draw(FULL)
+    const thumb = await draw(THUMB)
+    return { full, thumb }
   } finally {
+    canvas.width = 0
     if ('close' in source) source.close()
   }
-  throw new Error('Esa imagen es demasiado pesada para guardarla. Prueba con otra foto.')
 }
