@@ -76,7 +76,8 @@ function Comments({ photoId }: { photoId: string }) {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!user || !text.trim()) return
-    const name = member?.name?.trim() || emailToName(user.email) || 'Alguien'
+    // Must equal members/{uid}.name exactly: the rules reject any other name.
+    const name = member?.name || emailToName(user.email) || 'Alguien'
     void run(() => addComment(photoId, { uid: user.uid, name }, text), () => setText(''))
   }
 
