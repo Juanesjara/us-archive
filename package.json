@@ -17,9 +17,11 @@
     "firebase": "^12.19.0",
     "firebase-admin": "^14.5.0",
     "jose": "^6.2.12",
+    "maplibre-gl": "^6.12.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.4.0",
+    "supercluster": "^9.1.0",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {

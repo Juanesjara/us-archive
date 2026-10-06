@@ -32,6 +32,9 @@ export interface Photo {
   createdAt?: Timestamp
 }
 
+/** A photo that carries coordinates, so it can go on the map. */
+export type Located = Photo & { lat: number; lng: number }
+
 /** photos/{photoId}/comments/{id}. name is copied at write time so reading needs no lookup. */
 export interface Comment {
   id: string
