@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   collection,
+  collectionGroup,
   doc,
   onSnapshot,
   orderBy,
@@ -63,4 +64,24 @@ export function useDocument<T>(path: string): DocState<T> {
   }, [path])
 
   return state
+}
+
+/** Live count of comments per photo id, from one collection-group listener. */
+export function useCommentCounts(): Map<string, number> {
+  const [counts, setCounts] = useState(new Map<string, number>())
+
+  useEffect(
+    () =>
+      onSnapshot(collectionGroup(getDb(), 'comments'), (snap) => {
+        const next = new Map<string, number>()
+        for (const d of snap.docs) {
+          const photoId = d.ref.parent.parent?.id
+          if (photoId) next.set(photoId, (next.get(photoId) ?? 0) + 1)
+        }
+        setCounts(next)
+      }),
+    [],
+  )
+
+  return counts
 }
