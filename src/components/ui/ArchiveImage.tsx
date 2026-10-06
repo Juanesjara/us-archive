@@ -24,6 +24,8 @@ export function loadImage(id: string): Promise<string | null> {
   return pending
 }
 
+export const hasImage = (id: string) => cache.has(id)
+
 export function forgetImage(id: string) {
   cache.delete(id)
 }

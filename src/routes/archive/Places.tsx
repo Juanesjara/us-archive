@@ -1,13 +1,22 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useCollection } from '../../hooks/useCollection'
-import type { Photo } from '../../types'
+import type { Located, Photo } from '../../types'
 import { EmptyState, ErrorNote, Loading } from '../../components/ui/EmptyState'
 import { ArchiveImage } from '../../components/ui/ArchiveImage'
 import { Lightbox } from '../../components/ui/Lightbox'
-import { PhotoMap, type Located } from '../../components/ui/PhotoMap'
 import { formatMonthYear } from '../../lib/format'
 import { groupByPlace, type PlaceGroup } from '../../lib/places'
+
+// MapLibre is large; it only loads when this page has something to put on the map.
+// After a deploy an open tab may ask for a chunk that no longer exists; don't take the page down with it.
+const PhotoMap = lazy(() =>
+  import('../../components/ui/PhotoMap')
+    .then((m) => ({ default: m.PhotoMap }))
+    .catch(() => ({
+      default: () => <p className="text-meta text-muted">No se pudo cargar el mapa. Recarga la página.</p>,
+    })),
+)
 
 const hasCoords = (p: Photo): p is Located => p.lat != null && p.lng != null
 
@@ -24,8 +33,13 @@ export function Places() {
   const { items, loading, error } = useCollection<Photo>('photos')
   const places = useMemo(() => groupByPlace(items), [items])
   const located = useMemo(() => items.filter(hasCoords), [items])
-  const [openId, setOpenId] = useState<string | null>(null)
-  const openIndex = openId ? located.findIndex((p) => p.id === openId) : -1
+  // ids: a group opened from one map thumbnail; null walks through every located photo.
+  const [open, setOpen] = useState<{ id: string; ids: string[] | null } | null>(null)
+  const viewing = useMemo(
+    () => (open?.ids ? located.filter((p) => open.ids?.includes(p.id)) : located),
+    [located, open],
+  )
+  const openIndex = open ? viewing.findIndex((p) => p.id === open.id) : -1
 
   return (
     <div className="enter">
@@ -44,7 +58,9 @@ export function Places() {
         <>
           {located.length > 0 ? (
             <div className="mt-8">
-              <PhotoMap photos={located} onOpen={setOpenId} />
+              <Suspense fallback={<div className="h-80 w-full rounded-sm bg-well sm:h-[28rem]" />}>
+                <PhotoMap photos={located} onOpen={(id, ids) => setOpen({ id, ids: ids ?? null })} />
+              </Suspense>
             </div>
           ) : null}
           <ul className="mt-10 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 md:grid-cols-3">
@@ -68,10 +84,10 @@ export function Places() {
 
       {openIndex >= 0 ? (
         <Lightbox
-          photos={located}
+          photos={viewing}
           index={openIndex}
-          onClose={() => setOpenId(null)}
-          onIndex={(n) => setOpenId(located[n]?.id ?? null)}
+          onClose={() => setOpen(null)}
+          onIndex={(n) => setOpen((o) => (o && viewing[n] ? { ...o, id: viewing[n].id } : null))}
         />
       ) : null}
     </div>
