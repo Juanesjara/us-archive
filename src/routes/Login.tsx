@@ -44,7 +44,7 @@ export function Login() {
     setError(null)
     setBusy(true)
     try {
-      // Passwords are stored in lowercase, so "VESUVIO" or "Vesuvio" work too.
+      // Passwords are stored in lowercase, so any capitalisation of the right word works.
       await signIn(nameToEmail(name), password.trim().toLowerCase())
       const from = (location.state as { from?: string } | null)?.from
       navigate(from ?? (hasSeenIntro() ? '/archive' : '/intro'), { replace: true })

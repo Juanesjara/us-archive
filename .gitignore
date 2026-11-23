@@ -10,3 +10,10 @@ firebase-debug.log
 .vercel
 .DS_Store
 docs/
+
+# Credentials that must never be committed
+*.pem
+*.key
+*.p12
+service-account*.json
+*-firebase-adminsdk-*.json
