@@ -34,6 +34,10 @@ En Cloud Storage (bucket `us-archive-jj.firebasestorage.app`, us-central1): `ima
 - `vercel.json` manda una **CSP** estricta: cualquier dominio externo nuevo (API, fuentes, mapas) hay que agregarlo a `connect-src`/`img-src`/etc. o el navegador lo bloquea solo en producción (`npm run dev` no aplica esos headers).
 - Las reglas usan `hasOnly` en `photos` y `settings/official`: un campo nuevo que no esté en la lista se rechaza. Un comentario solo se acepta si `name` es exactamente `members/{uid}.name`.
 
+## Secretos
+
+El repo es **público**. Nunca se commitea: `.env*` (salvo `.env.example` vacío), llaves de cuentas de servicio (`*-firebase-adminsdk-*.json`, `service-account*.json`), `*.pem`/`*.key`, tokens, contraseñas ni pistas de contraseñas, correos personales. La config web de Firebase (`VITE_FIREBASE_*`) vive en Vercel y en `.env` local; termina en el bundle por diseño, la protegen las reglas y las restricciones de la API key en Google Cloud. El workflow `secret-scan` (gitleaks) revisa cada push y PR.
+
 ## Convenciones
 
 - Código y comentarios en inglés; **todo texto visible al usuario en español** (es-CO), incluidos mensajes de error lanzados desde `services` (se muestran tal cual vía `errorMessage`).
@@ -58,4 +62,4 @@ Para que el Git Credential Manager no pregunte qué cuenta usar en `push`/`fetch
 
 ## Firebase CLI
 
-El CLI tiene varias cuentas de Google; este proyecto (`us-archive-jj`) usa **juanesteban0607bmx@gmail.com**, fijada para esta carpeta con `firebase login:use juanesteban0607bmx@gmail.com`. Si un deploy da 403, revisa `firebase login:list` y vuelve a fijarla. Despliega las reglas **antes** de mergear código que dependa de ellas: `firebase deploy --only firestore:rules`.
+El CLI tiene varias cuentas de Google; este proyecto (`us-archive-jj`) usa la cuenta dueña del proyecto, fijada para esta carpeta con `firebase login:use <correo>` (no escribas correos en este archivo: el repo es público). Si un deploy da 403, revisa `firebase login:list` y vuelve a fijarla. Despliega las reglas **antes** de mergear código que dependa de ellas: `firebase deploy --only firestore:rules`.
